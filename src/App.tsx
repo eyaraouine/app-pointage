@@ -1,0 +1,52 @@
+
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { StoreProvider } from './context/StoreContext';
+import Layout from './components/Layout';
+import AttendancePage from './pages/AttendancePage';
+import EmployeesPage from './pages/EmployeesPage';
+import ZonesPage from './pages/ZonesPage';
+import LogsPage from './pages/LogsPage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
+import ProtectedRoute from './components/ProtectedRoute';
+
+function App() {
+  return (
+    <StoreProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Layout />}>
+            <Route index element={<AttendancePage />} />
+
+            {/* Protected Admin Routes */}
+            <Route path="admin/employees" element={
+              <ProtectedRoute>
+                <EmployeesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="admin/zones" element={
+              <ProtectedRoute>
+                <ZonesPage />
+              </ProtectedRoute>
+            } />
+            <Route path="admin/logs" element={
+              <ProtectedRoute>
+                <LogsPage />
+              </ProtectedRoute>
+            } />
+
+            {/* Auth Routes */}
+            <Route path="login" element={<LoginPage />} />
+            <Route path="register" element={<RegisterPage />} />
+            <Route path="forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="reset-password" element={<ResetPasswordPage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </StoreProvider>
+  );
+}
+
+export default App;
