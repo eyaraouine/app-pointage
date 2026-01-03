@@ -15,7 +15,9 @@ const RegisterPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
 
@@ -29,19 +31,25 @@ const RegisterPage: React.FC = () => {
             return;
         }
 
-        registerAdmin({
-            id: crypto.randomUUID(),
-            name,
-            email,
-            phone,
-            username,
-            password
-        });
+        setLoading(true);
+        try {
+            await registerAdmin({
+                id: '', // Will be set by Firebase Auth UID
+                name,
+                email,
+                phone,
+                username,
+            }, password);
 
-        setSuccess(true);
-        setTimeout(() => {
-            navigate('/admin/employees');
-        }, 2000);
+            setSuccess(true);
+            setTimeout(() => {
+                navigate('/admin/employees');
+            }, 2000);
+        } catch (err: any) {
+            setError(err.message || "Une erreur est survenue lors de l'inscription.");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -149,9 +157,10 @@ const RegisterPage: React.FC = () => {
 
                         <button
                             type="submit"
-                            className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 active:scale-[0.98] transition-all"
+                            disabled={loading}
+                            className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            S'inscrire
+                            {loading ? "Création du compte..." : "S'inscrire"}
                         </button>
                     </form>
                 )}

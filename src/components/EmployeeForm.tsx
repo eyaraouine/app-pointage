@@ -78,15 +78,18 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess }) => {
             // 2. Face Detection
             const img = new Image();
             img.src = capturedImage;
-            await new Promise((resolve) => { img.onload = resolve; });
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = () => reject(new Error("Impossible de charger l'image capturée."));
+            });
 
             const detection = await faceapi.detectSingleFace(
                 img,
-                new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 })
+                new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 })
             ).withFaceLandmarks().withFaceDescriptor();
 
             if (!detection) {
-                setError("Aucun visage détecté. Veuillez reprendre la photo.");
+                setError("Aucun visage détecté. Veuillez reprendre la photo en étant bien éclairé.");
                 setProcessing(false);
                 return;
             }
@@ -100,7 +103,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess }) => {
                     );
                 });
 
-                const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.5); // 0.5 threshold for registration check
+                const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.5);
                 const match = faceMatcher.findBestMatch(detection.descriptor);
 
                 if (match.label !== 'unknown') {
@@ -113,17 +116,17 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess }) => {
 
             // 4. Save employee
             const newEmployee = {
-                id: crypto.randomUUID(),
+                id: '', // Will be set by Firestore
                 firstName,
                 lastName,
                 photoDescriptor: Array.from(detection.descriptor),
                 photo: capturedImage,
-                matricule: matricule || undefined,
-                phone: phone || undefined,
+                matricule: matricule || "",
+                phone: phone || "",
                 role: 'employee' as const,
             };
 
-            addEmployee(newEmployee);
+            await addEmployee(newEmployee);
             setShowSuccess(true);
 
             setTimeout(() => {
@@ -133,9 +136,9 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess }) => {
                     navigate('/admin/employees');
                 }
             }, 2000);
-        } catch (err) {
-            console.error(err);
-            setError("Erreur lors du traitement de la photo.");
+        } catch (err: any) {
+            console.error("Face processing error:", err);
+            setError(`Erreur: ${err.message || "Problème lors du traitement de la photo"}`);
         } finally {
             setProcessing(false);
         }

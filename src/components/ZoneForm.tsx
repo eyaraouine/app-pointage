@@ -228,7 +228,7 @@ const ZoneForm: React.FC<ZoneFormProps> = ({ onSuccess }) => {
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name || !position) return;
         setError(null);
@@ -250,8 +250,8 @@ const ZoneForm: React.FC<ZoneFormProps> = ({ onSuccess }) => {
             return;
         }
 
-        addZone({
-            id: crypto.randomUUID(),
+        await addZone({
+            id: '', // Will be set by Firestore
             name,
             lat: position.lat,
             lng: position.lng,

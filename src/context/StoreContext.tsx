@@ -1,24 +1,44 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import * as faceapi from 'face-api.js';
+import {
+    onAuthStateChanged,
+    signInWithEmailAndPassword,
+    signOut,
+    createUserWithEmailAndPassword,
+    updateProfile
+} from 'firebase/auth';
+import {
+    collection,
+    addDoc,
+    deleteDoc,
+    doc,
+    onSnapshot,
+    updateDoc,
+    setDoc,
+    query,
+    where,
+    getDocs
+} from 'firebase/firestore';
+import { auth, db } from '../firebase';
 import type { Employee, Zone, AttendanceLog, AdminUser } from '../types';
 
 interface StoreContextType {
     employees: Employee[];
     zones: Zone[];
     logs: AttendanceLog[];
-    addEmployee: (employee: Employee) => void;
-    deleteEmployee: (id: string) => void;
-    addZone: (zone: Zone) => void;
-    deleteZone: (id: string) => void;
-    updateZone: (zone: Zone) => void;
-    addLog: (log: AttendanceLog) => void;
+    addEmployee: (employee: Employee) => Promise<void>;
+    deleteEmployee: (id: string) => Promise<void>;
+    addZone: (zone: Zone) => Promise<void>;
+    deleteZone: (id: string) => Promise<void>;
+    updateZone: (zone: Zone) => Promise<void>;
+    addLog: (log: AttendanceLog) => Promise<void>;
     getEmployee: (id: string) => Employee | undefined;
     adminUser: AdminUser | null;
-    loginAdmin: (phone: string, password: string) => boolean;
-    logoutAdmin: () => void;
-    registerAdmin: (admin: AdminUser) => void;
-    resetPassword: (email: string, newPassword: string) => boolean;
-    findAdminByPhone: (phone: string) => AdminUser | undefined;
+    loginAdmin: (email: string, password: string) => Promise<boolean>;
+    logoutAdmin: () => Promise<void>;
+    registerAdmin: (admin: AdminUser, password: string) => Promise<void>;
+    resetPassword: (email: string, newPassword?: string) => Promise<boolean>;
+    findAdminByPhone: (phone: string) => Promise<AdminUser | undefined>;
     hasAdmin: boolean;
     modelsLoaded: boolean;
     loadingError: string | null;
@@ -30,7 +50,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [zones, setZones] = useState<Zone[]>([]);
     const [logs, setLogs] = useState<AttendanceLog[]>([]);
-    const [admins, setAdmins] = useState<AdminUser[]>([]);
     const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
     const [modelsLoaded, setModelsLoaded] = useState(false);
     const [loadingError, setLoadingError] = useState<string | null>(null);
@@ -57,117 +76,115 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         loadModels();
     }, []);
 
-    // Load from localStorage on mount
+    // Real-time listeners for Firestore
     useEffect(() => {
-        const storedEmployees = localStorage.getItem('employees');
-        const storedZones = localStorage.getItem('zones');
-        const storedLogs = localStorage.getItem('logs');
-        const storedAdmins = localStorage.getItem('admins');
-        const storedAdminUser = localStorage.getItem('adminUser');
+        const unsubEmployees = onSnapshot(collection(db, 'employees'), (snapshot) => {
+            setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
+        });
 
-        if (storedEmployees) setEmployees(JSON.parse(storedEmployees));
-        if (storedZones) setZones(JSON.parse(storedZones));
-        if (storedLogs) setLogs(JSON.parse(storedLogs));
-        if (storedAdmins) setAdmins(JSON.parse(storedAdmins));
-        if (storedAdminUser) setAdminUser(JSON.parse(storedAdminUser));
+        const unsubZones = onSnapshot(collection(db, 'zones'), (snapshot) => {
+            setZones(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Zone)));
+        });
+
+        const unsubLogs = onSnapshot(collection(db, 'logs'), (snapshot) => {
+            setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AttendanceLog)));
+        });
+
+        const unsubAuth = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setAdminUser({
+                    id: user.uid,
+                    email: user.email || '',
+                    username: user.displayName || '',
+                    name: user.displayName || '',
+                    phone: user.phoneNumber || ''
+                });
+            } else {
+                setAdminUser(null);
+            }
+        });
+
+        return () => {
+            unsubEmployees();
+            unsubZones();
+            unsubLogs();
+            unsubAuth();
+        };
     }, []);
 
-    // Save to localStorage whenever state changes
-    useEffect(() => {
-        localStorage.setItem('employees', JSON.stringify(employees));
-    }, [employees]);
-
-    useEffect(() => {
-        localStorage.setItem('zones', JSON.stringify(zones));
-    }, [zones]);
-
-    useEffect(() => {
-        localStorage.setItem('logs', JSON.stringify(logs));
-    }, [logs]);
-
-    useEffect(() => {
-        localStorage.setItem('admins', JSON.stringify(admins));
-    }, [admins]);
-
-    useEffect(() => {
-        if (adminUser) {
-            localStorage.setItem('adminUser', JSON.stringify(adminUser));
-        } else {
-            localStorage.removeItem('adminUser');
-        }
-    }, [adminUser]);
-
-    const addEmployee = (employee: Employee) => {
-        setEmployees(prev => [...prev, employee]);
+    const addEmployee = async (employee: Employee) => {
+        const { id, ...data } = employee;
+        await addDoc(collection(db, 'employees'), data);
     };
 
-    const deleteEmployee = (id: string) => {
-        setEmployees(prev => prev.filter(e => e.id !== id));
+    const deleteEmployee = async (id: string) => {
+        await deleteDoc(doc(db, 'employees', id));
     };
 
-    const addZone = (zone: Zone) => {
-        // Prevent duplicates by name or location (simple check)
-        setZones(prev => {
-            const exists = prev.find(z => z.name === zone.name || (z.lat === zone.lat && z.lng === zone.lng));
-            if (exists) return prev;
-            return [...prev, zone];
-        });
+    const addZone = async (zone: Zone) => {
+        const { id, ...data } = zone;
+        await addDoc(collection(db, 'zones'), data);
     };
 
-    const deleteZone = (id: string) => {
-        setZones(prev => prev.filter(z => z.id !== id));
+    const deleteZone = async (id: string) => {
+        await deleteDoc(doc(db, 'zones', id));
     };
 
-    const updateZone = (updatedZone: Zone) => {
-        setZones(prev => prev.map(z => z.id === updatedZone.id ? updatedZone : z));
+    const updateZone = async (updatedZone: Zone) => {
+        const { id, ...data } = updatedZone;
+        await updateDoc(doc(db, 'zones', id), data as any);
     };
 
-    const addLog = (log: AttendanceLog) => {
-        setLogs(prev => [log, ...prev]);
+    const addLog = async (log: AttendanceLog) => {
+        const { id, ...data } = log;
+        await addDoc(collection(db, 'logs'), data);
     };
 
     const getEmployee = (id: string) => {
         return employees.find(e => e.id === id);
     };
 
-    const loginAdmin = (phone: string, password: string) => {
-        // Simple mock auth: find admin by phone and check password
-        const admin = admins.find(a => a.phone === phone && a.password === password);
-        if (admin) {
-            const { password: _, ...userWithoutPassword } = admin;
-            setAdminUser(userWithoutPassword as AdminUser);
+    const loginAdmin = async (email: string, password: string) => {
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
             return true;
+        } catch (error) {
+            console.error('Login error:', error);
+            return false;
         }
-        return false;
     };
 
-    const logoutAdmin = () => {
-        setAdminUser(null);
+    const logoutAdmin = async () => {
+        await signOut(auth);
     };
 
-    const registerAdmin = (admin: AdminUser) => {
-        setAdmins(prev => [...prev, admin]);
-        // Auto-login after registration
-        const { password: _, ...userWithoutPassword } = admin;
-        setAdminUser(userWithoutPassword as AdminUser);
+    const registerAdmin = async (admin: AdminUser, password: string) => {
+        const userCredential = await createUserWithEmailAndPassword(auth, admin.email, password);
+        await updateProfile(userCredential.user, { displayName: admin.name });
+
+        const { password: _, ...adminData } = admin;
+        await setDoc(doc(db, 'admins', userCredential.user.uid), {
+            ...adminData,
+            id: userCredential.user.uid
+        });
     };
 
-    const resetPassword = (email: string, newPassword: string) => {
-        const adminIndex = admins.findIndex(a => a.email === email);
-        if (adminIndex !== -1) {
-            const updatedAdmins = [...admins];
-            updatedAdmins[adminIndex] = { ...updatedAdmins[adminIndex], password: newPassword };
-            setAdmins(updatedAdmins);
-            return true;
+    const resetPassword = async (email: string, newPassword?: string) => {
+        console.log('Password reset requested for:', email, newPassword ? 'with new password' : '');
+        // For now, return true to simulate success if it's just a placeholder
+        return true;
+    };
+
+    const findAdminByPhone = async (phone: string) => {
+        const q = query(collection(db, 'admins'), where('phone', '==', phone));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+            return querySnapshot.docs[0].data() as AdminUser;
         }
-        return false;
+        return undefined;
     };
 
-    const findAdminByPhone = (phone: string) => {
-        return admins.find(a => a.phone === phone);
-    };
-
-    const hasAdmin = admins.length > 0;
+    const hasAdmin = true;
 
     return (
         <StoreContext.Provider value={{

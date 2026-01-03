@@ -14,7 +14,7 @@ const Layout: React.FC = () => {
         ...(adminUser ? [
             { path: '/admin/employees', icon: Users, label: 'Employés' },
             { path: '/admin/zones', icon: MapPin, label: 'Zones' },
-            { path: '/admin/logs', icon: ClipboardList, label: 'Historique' },
+            { path: '/admin/logs', icon: ClipboardList, label: 'Journal' },
         ] : []),
     ];
 

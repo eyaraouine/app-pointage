@@ -24,7 +24,7 @@ const ForgotPasswordPage: React.FC = () => {
         setError(null);
         setLoading(true);
 
-        const admin = findAdminByPhone(phone);
+        const admin = await findAdminByPhone(phone);
 
         if (!admin) {
             setError("Aucun compte administrateur trouvé avec ce numéro de téléphone.");

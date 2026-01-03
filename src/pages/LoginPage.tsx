@@ -7,21 +7,29 @@ const LoginPage: React.FC = () => {
     const { loginAdmin, hasAdmin } = useStore();
     const navigate = useNavigate();
     const location = useLocation();
-    const [phone, setPhone] = useState('');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
 
     const from = (location.state as any)?.from?.pathname || "/admin/employees";
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
+        setLoading(true);
 
-        const success = loginAdmin(phone, password);
-        if (success) {
-            navigate(from, { replace: true });
-        } else {
-            setError("Téléphone ou mot de passe incorrect.");
+        try {
+            const success = await loginAdmin(email, password);
+            if (success) {
+                navigate(from, { replace: true });
+            } else {
+                setError("Email ou mot de passe incorrect.");
+            }
+        } catch (err) {
+            setError("Une erreur est survenue lors de la connexion.");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -49,13 +57,13 @@ const LoginPage: React.FC = () => {
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                         <input
-                            type="tel"
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
                             className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
-                            placeholder="22 123 456"
+                            placeholder="admin@example.com"
                             required
                         />
                     </div>
@@ -86,9 +94,10 @@ const LoginPage: React.FC = () => {
 
                     <button
                         type="submit"
-                        className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 active:scale-[0.98] transition-all"
+                        disabled={loading}
+                        className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Se connecter
+                        {loading ? "Connexion..." : "Se connecter"}
                     </button>
                 </form>
 

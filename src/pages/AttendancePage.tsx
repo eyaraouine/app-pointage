@@ -6,7 +6,7 @@ import { MapPin, CheckCircle, AlertTriangle } from 'lucide-react';
 import { getDistance } from 'geolib';
 
 const AttendancePage: React.FC = () => {
-    const { employees, zones, addLog, modelsLoaded, loadingError } = useStore();
+    const { employees, zones, logs, addLog, modelsLoaded, loadingError } = useStore();
     const webcamRef = useRef<Webcam>(null);
 
     const [location, setLocation] = useState<{ lat: number, lng: number } | null>(null);
@@ -15,6 +15,7 @@ const AttendancePage: React.FC = () => {
     const [status, setStatus] = useState<'idle' | 'capturing' | 'processing' | 'success'>('idle');
     const [matchedEmployee, setMatchedEmployee] = useState<string | null>(null);
     const [matchedPhoto, setMatchedPhoto] = useState<string | null>(null);
+    const [lastLogType, setLastLogType] = useState<'check-in' | 'check-out' | null>(null);
     const [accuracy, setAccuracy] = useState<number | null>(null);
 
 
@@ -102,12 +103,15 @@ const AttendancePage: React.FC = () => {
 
             const img = new Image();
             img.src = imageSrc;
-            await new Promise((resolve) => { img.onload = resolve; });
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = () => reject(new Error("Impossible de charger l'image capturée."));
+            });
 
-            // Detect face with more robust SsdMobilenetv1
+            // Detect face with TinyFaceDetector
             const detection = await faceapi.detectSingleFace(
                 img,
-                new faceapi.SsdMobilenetv1Options({ minConfidence: 0.4 })
+                new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 })
             ).withFaceLandmarks().withFaceDescriptor();
 
             if (!detection) {
@@ -140,21 +144,40 @@ const AttendancePage: React.FC = () => {
                 setStatus('idle');
                 return;
             }
-
             const employee = employees.find(e => e.id === match.label);
             if (employee) {
                 setMatchedEmployee(`${employee.firstName} ${employee.lastName}`);
                 setMatchedPhoto(employee.photo || null);
+
+                // Determine log type (reset daily)
+                const today = new Date().toISOString().split('T')[0];
+                const employeeLogsToday = logs
+                    .filter(l => l.employeeId === employee.id && l.timestamp.startsWith(today))
+                    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+                const lastLog = employeeLogsToday[0];
+                const newType = (!lastLog || lastLog.type === 'check-out') ? 'check-in' : 'check-out';
+                setLastLogType(newType);
+
+                // Re-calculate zone at the exact moment of pointage for reliability
+                const zoneAtMoment = zones.find(zone => {
+                    const dist = getDistance(
+                        { latitude: location!.lat, longitude: location!.lng },
+                        { latitude: zone.lat, longitude: zone.lng }
+                    );
+                    return dist <= zone.radius + 30;
+                });
 
                 // Log attendance
                 addLog({
                     id: crypto.randomUUID(),
                     employeeId: employee.id,
                     timestamp: new Date().toISOString(),
-                    type: 'check-in', // Simplified for now, could toggle check-in/out
+                    type: newType,
                     location: location || { lat: 0, lng: 0 },
                     verified: true,
-                    method: 'face_geo'
+                    method: 'face_geo',
+                    zoneName: zoneAtMoment ? zoneAtMoment.name : (currentZone || undefined)
                 });
 
                 setStatus('success');
@@ -162,12 +185,13 @@ const AttendancePage: React.FC = () => {
                     setStatus('idle');
                     setMatchedEmployee(null);
                     setMatchedPhoto(null);
+                    setLastLogType(null);
                 }, 3000);
             }
 
-        } catch (err) {
-            console.error(err);
-            setError("Erreur lors du pointage.");
+        } catch (err: any) {
+            console.error("Attendance error:", err);
+            setError(`Erreur: ${err.message || "Problème lors du pointage"}`);
             setStatus('idle');
         }
     };
@@ -206,6 +230,9 @@ const AttendancePage: React.FC = () => {
                 </div>
                 <h2 className="text-2xl font-bold text-green-800">Pointage Réussi !</h2>
                 <p className="text-lg text-gray-700 mt-2">Bonjour, {matchedEmployee}</p>
+                <div className={`mt-2 px-4 py-1 rounded-full text-sm font-bold ${lastLogType === 'check-in' ? 'bg-blue-100 text-blue-700' : 'bg-orange-100 text-orange-700'}`}>
+                    {lastLogType === 'check-in' ? 'ENTRÉE ENREGISTRÉE' : 'SORTIE ENREGISTRÉE'}
+                </div>
                 <p className="text-sm text-gray-500 mt-4">
                     {new Date().toLocaleString()} <br />
                     {currentZone}

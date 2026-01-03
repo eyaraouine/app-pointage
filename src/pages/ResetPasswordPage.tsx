@@ -14,7 +14,7 @@ const ResetPasswordPage: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
 
@@ -33,7 +33,7 @@ const ResetPasswordPage: React.FC = () => {
             return;
         }
 
-        const ok = resetPassword(email, password);
+        const ok = await resetPassword(email, password);
         if (ok) {
             setSuccess(true);
             setTimeout(() => {

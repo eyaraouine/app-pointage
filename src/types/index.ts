@@ -28,6 +28,7 @@ export interface AttendanceLog {
     };
     verified: boolean;
     method: 'face_geo' | 'manual_admin';
+    zoneName?: string;
 }
 
 export interface AdminUser {
