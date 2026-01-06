@@ -27,6 +27,7 @@ interface StoreContextType {
     zones: Zone[];
     logs: AttendanceLog[];
     addEmployee: (employee: Employee) => Promise<void>;
+    updateEmployee: (employee: Employee) => Promise<void>;
     deleteEmployee: (id: string) => Promise<void>;
     addZone: (zone: Zone) => Promise<void>;
     deleteZone: (id: string) => Promise<void>;
@@ -68,9 +69,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 ]);
                 setModelsLoaded(true);
                 console.log('Face API models loaded successfully');
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Error loading Face API models:', error);
-                setLoadingError("Erreur lors du chargement des modèles IA. Vérifiez votre connexion.");
+                setLoadingError(`Erreur lors du chargement des modèles IA: ${error.message || JSON.stringify(error)}. Vérifiez votre connexion.`);
             }
         };
         loadModels();
@@ -115,6 +116,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const addEmployee = async (employee: Employee) => {
         const { id, ...data } = employee;
         await addDoc(collection(db, 'employees'), data);
+    };
+
+    const updateEmployee = async (employee: Employee) => {
+        const { id, ...data } = employee;
+        if (!id) return;
+        await updateDoc(doc(db, 'employees', id), data as any);
     };
 
     const deleteEmployee = async (id: string) => {
@@ -192,6 +199,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             zones,
             logs,
             addEmployee,
+            updateEmployee,
             deleteEmployee,
             addZone,
             deleteZone,

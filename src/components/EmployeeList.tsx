@@ -1,8 +1,13 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
-import { User, Trash2, Phone, Hash } from 'lucide-react';
+import { User, Trash2, Phone, Hash, Pencil } from 'lucide-react';
+import type { Employee } from '../types';
 
-const EmployeeList: React.FC = () => {
+interface EmployeeListProps {
+    onEdit: (employee: Employee) => void;
+}
+
+const EmployeeList: React.FC<EmployeeListProps> = ({ onEdit }) => {
     const { employees, deleteEmployee } = useStore();
 
     if (employees.length === 0) {
@@ -46,17 +51,26 @@ const EmployeeList: React.FC = () => {
                             )}
                         </div>
                     </div>
-                    <button
-                        onClick={() => {
-                            if (window.confirm(`Voulez-vous vraiment supprimer l'employé ${employee.firstName} ${employee.lastName} ?`)) {
-                                deleteEmployee(employee.id);
-                            }
-                        }}
-                        className="ml-auto p-2 text-gray-400 hover:text-red-600 transition-colors"
-                        title="Supprimer l'employé"
-                    >
-                        <Trash2 size={20} />
-                    </button>
+                    <div className="ml-auto flex items-center gap-1">
+                        <button
+                            onClick={() => onEdit(employee)}
+                            className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                            title="Modifier l'employé"
+                        >
+                            <Pencil size={20} />
+                        </button>
+                        <button
+                            onClick={() => {
+                                if (window.confirm(`Voulez-vous vraiment supprimer l'employé ${employee.firstName} ${employee.lastName} ?`)) {
+                                    deleteEmployee(employee.id);
+                                }
+                            }}
+                            className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                            title="Supprimer l'employé"
+                        >
+                            <Trash2 size={20} />
+                        </button>
+                    </div>
                 </div>
             ))}
         </div>

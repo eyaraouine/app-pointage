@@ -7,6 +7,7 @@ export interface Employee {
     matricule?: string;
     phone?: string;
     role: 'admin' | 'employee';
+    isKiosk: boolean;
 }
 
 export interface Zone {

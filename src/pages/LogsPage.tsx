@@ -14,7 +14,8 @@ import {
     isWeekend
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { Search, Calendar, ChevronRight, Clock, MapPin, X, Info, ChevronLeft } from 'lucide-react';
+import { Search, Calendar, ChevronRight, Clock, MapPin, X, Info, ChevronLeft, Download, FileSpreadsheet, Trash2, FileText } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 const LogsPage: React.FC = () => {
     const { logs, employees } = useStore();
@@ -24,6 +25,9 @@ const LogsPage: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
     const [showMonthlyDetail, setShowMonthlyDetail] = useState(false);
+    const [showDailyDetailInline, setShowDailyDetailInline] = useState(false);
+    const [generatedFiles, setGeneratedFiles] = useState<{ name: string, date: Date, data: any, type: string }[]>([]);
+    const [showDownloads, setShowDownloads] = useState(false);
 
     // Generate days for the daily selector (7 days around selected date)
     const days = useMemo(() => {
@@ -165,6 +169,112 @@ const LogsPage: React.FC = () => {
 
     const currentMonthlyStat = monthlyStats.find(s => s.employeeId === selectedEmployeeId);
 
+    const addGeneratedFile = (name: string, data: any, type: string) => {
+        setGeneratedFiles(prev => [{ name, date: new Date(), data, type }, ...prev].slice(0, 10));
+        setShowDownloads(true);
+    };
+
+    const exportDaily = (formatType: 'xlsx' | 'csv') => {
+        const data = dailyStats.map(stat => {
+            const emp = employees.find(e => e.id === stat.employeeId);
+            return {
+                'Employé': `${emp?.firstName} ${emp?.lastName}`,
+                'Date': format(selectedDate, 'dd/MM/yyyy'),
+                'Première Entrée': stat.firstIn ? format(new Date(stat.firstIn), 'HH:mm') : '-',
+                'Dernière Sortie': stat.lastOut ? format(new Date(stat.lastOut), 'HH:mm') : '-',
+                'Total Travaillé': formatDurationShort(stat.totalMinutes),
+                'Statut': stat.status
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Présence Quotidienne");
+        const fileName = `Presence_Quotidienne_${format(selectedDate, 'yyyy-MM-dd')}.${formatType}`;
+
+        if (formatType === 'csv') {
+            const csv = XLSX.utils.sheet_to_csv(ws);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            addGeneratedFile(fileName, blob, 'csv');
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", fileName);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else {
+            XLSX.writeFile(wb, fileName);
+            addGeneratedFile(fileName, wb, 'xlsx');
+        }
+    };
+
+    const exportMonthly = (formatType: 'xlsx' | 'csv') => {
+        const data = monthlyStats.map(stat => {
+            const emp = employees.find(e => e.id === stat.employeeId);
+            return {
+                'Employé': `${emp?.firstName} ${emp?.lastName}`,
+                'Mois': format(selectedMonth, 'MMMM yyyy', { locale: fr }),
+                'Jours Travaillés': stat.daysWorked,
+                'Total Heures': formatDurationShort(stat.totalMinutes)
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Présence Mensuelle");
+        const fileName = `Presence_Mensuelle_${format(selectedMonth, 'yyyy-MM')}.${formatType}`;
+
+        if (formatType === 'csv') {
+            const csv = XLSX.utils.sheet_to_csv(ws);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            addGeneratedFile(fileName, blob, 'csv');
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", fileName);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else {
+            XLSX.writeFile(wb, fileName);
+            addGeneratedFile(fileName, wb, 'xlsx');
+        }
+    };
+
+    const exportEmployeeMonthly = (formatType: 'xlsx' | 'csv') => {
+        if (!selectedEmployee || !currentMonthlyStat) return;
+
+        const data = monthlyDetailDays.map(day => {
+            const dayKey = format(day, 'yyyy-MM-dd');
+            const dayStat = currentMonthlyStat.dailyBreakdown[dayKey];
+            return {
+                'Date': format(day, 'dd/MM/yyyy'),
+                'Jour': format(day, 'EEEE', { locale: fr }),
+                'Total Travaillé': dayStat ? formatDurationShort(dayStat.totalMinutes) : '0:00',
+                'Notes': isWeekend(day) ? 'Repos' : (dayStat ? '' : 'Absent')
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Détail Mensuel");
+        const fileName = `Presence_${selectedEmployee.firstName}_${selectedEmployee.lastName}_${format(selectedMonth, 'yyyy-MM')}.${formatType}`;
+
+        if (formatType === 'csv') {
+            const csv = XLSX.utils.sheet_to_csv(ws);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            addGeneratedFile(fileName, blob, 'csv');
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute("download", fileName);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else {
+            XLSX.writeFile(wb, fileName);
+            addGeneratedFile(fileName, wb, 'xlsx');
+        }
+    };
+
     return (
         <div className="flex flex-col h-full bg-gray-50">
             {/* Header */}
@@ -177,9 +287,22 @@ const LogsPage: React.FC = () => {
                             <ChevronLeft size={14} className="rotate-270" />
                         </div>
                     </div>
-                    <button className="p-2 bg-gray-100 rounded-full text-gray-600">
-                        <Calendar size={20} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setShowDownloads(true)}
+                            className="p-2 bg-gray-100 rounded-full text-gray-600 relative"
+                        >
+                            <Download size={20} />
+                            {generatedFiles.length > 0 && (
+                                <span className="absolute -top-1 -right-1 w-4 h-4 bg-orange-500 text-white text-[10px] flex items-center justify-center rounded-full font-bold">
+                                    {generatedFiles.length}
+                                </span>
+                            )}
+                        </button>
+                        <button className="p-2 bg-gray-100 rounded-full text-gray-600">
+                            <Calendar size={20} />
+                        </button>
+                    </div>
                 </div>
 
                 {/* Tab Switcher */}
@@ -229,6 +352,24 @@ const LogsPage: React.FC = () => {
                         </button>
                     </div>
                 )}
+
+                {/* Export Buttons */}
+                <div className="mt-4 flex justify-end gap-2">
+                    <button
+                        onClick={() => viewMode === 'daily' ? exportDaily('csv') : exportMonthly('csv')}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors"
+                    >
+                        <FileText size={18} className="text-blue-600" />
+                        Exporter en CSV
+                    </button>
+                    <button
+                        onClick={() => viewMode === 'daily' ? exportDaily('xlsx') : exportMonthly('xlsx')}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors"
+                    >
+                        <FileSpreadsheet size={18} className="text-green-600" />
+                        Exporter en Excel
+                    </button>
+                </div>
             </div>
 
             {/* Search Bar */}
@@ -319,9 +460,87 @@ const LogsPage: React.FC = () => {
                 )}
             </div>
 
-            {/* Daily Detail Modal */}
-            {viewMode === 'daily' && selectedEmployeeId && selectedEmployee && !showMonthlyDetail && (
-                <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+            {/* Monthly Detail Modal */}
+            {showMonthlyDetail && selectedEmployee && (
+                <div className="fixed inset-0 bg-white z-50 flex flex-col">
+                    <div className="p-4 border-b flex items-center justify-between bg-white">
+                        <div className="flex items-center gap-4">
+                            <button onClick={() => setShowMonthlyDetail(false)} className="p-2 hover:bg-gray-100 rounded-full">
+                                <ChevronLeft size={24} />
+                            </button>
+                            <h2 className="text-lg font-bold">Feuille de temps mensuelle</h2>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => exportEmployeeMonthly('csv')}
+                                className="p-2 bg-white border border-gray-200 text-blue-600 rounded-lg hover:bg-gray-50 transition-colors"
+                                title="Exporter en CSV"
+                            >
+                                <FileText size={20} />
+                            </button>
+                            <button
+                                onClick={() => exportEmployeeMonthly('xlsx')}
+                                className="p-2 bg-white border border-gray-200 text-green-600 rounded-lg hover:bg-gray-50 transition-colors"
+                                title="Exporter en Excel"
+                            >
+                                <FileSpreadsheet size={20} />
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="p-6 flex flex-col items-center border-b">
+                        <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-200 mb-4">
+                            {selectedEmployee.photo && <img src={selectedEmployee.photo} alt="" className="w-full h-full object-cover" />}
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900">{selectedEmployee.firstName} {selectedEmployee.lastName}</h3>
+                    </div>
+
+                    <div className="grid grid-cols-2 border-b">
+                        <div className="p-4 border-r text-center">
+                            <p className="text-xs text-gray-500 mb-1">Heures suivies</p>
+                            <p className="text-xl font-black text-gray-900">{formatDuration(currentMonthlyStat?.totalMinutes || 0)}</p>
+                        </div>
+                        <div className="p-4 text-center">
+                            <p className="text-xs text-gray-500 mb-1">Heures de paie</p>
+                            <p className="text-xl font-black text-gray-900">{formatDuration(currentMonthlyStat?.totalMinutes || 0)}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto">
+                        {monthlyDetailDays.map(day => {
+                            const dayKey = format(day, 'yyyy-MM-dd');
+                            const dayStat = currentMonthlyStat?.dailyBreakdown[dayKey];
+                            const isOff = isWeekend(day);
+
+                            return (
+                                <button
+                                    key={dayKey}
+                                    onClick={() => {
+                                        setSelectedDate(day);
+                                        setShowDailyDetailInline(true);
+                                    }}
+                                    className="w-full p-4 border-b flex justify-between items-center bg-white hover:bg-gray-50 active:bg-gray-100 transition-colors text-left"
+                                >
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-bold text-gray-900 capitalize">{format(day, 'eee., MMM. d', { locale: fr })}</span>
+                                            {isOff && <span className="px-2 py-0.5 bg-gray-200 text-gray-600 text-[10px] font-bold rounded-full uppercase">Rest Day</span>}
+                                        </div>
+                                        <p className="text-xs text-gray-400 mt-1">
+                                            {dayStat ? `Total: ${formatDuration(dayStat.totalMinutes)}` : "N'a pas effectué le pointage d'arrivée"}
+                                        </p>
+                                    </div>
+                                    <ChevronRight size={20} className="text-gray-300" />
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* Daily Detail Modal (Rendered last with higher z-index to be on top of monthly detail) */}
+            {((viewMode === 'daily' && !showMonthlyDetail) || showDailyDetailInline) && selectedEmployeeId && selectedEmployee && (
+                <div className="fixed inset-0 bg-black/50 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
                     <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl animate-slide-up">
                         <div className="p-4 border-b flex justify-between items-center bg-gray-50">
                             <div className="flex items-center gap-3">
@@ -333,7 +552,13 @@ const LogsPage: React.FC = () => {
                                     <p className="text-xs text-gray-500">{format(selectedDate, 'dd MMMM yyyy', { locale: fr })}</p>
                                 </div>
                             </div>
-                            <button onClick={() => setSelectedEmployeeId(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                            <button
+                                onClick={() => {
+                                    setShowDailyDetailInline(false);
+                                    if (viewMode === 'daily') setSelectedEmployeeId(null);
+                                }}
+                                className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+                            >
                                 <X size={20} className="text-gray-500" />
                             </button>
                         </div>
@@ -374,55 +599,67 @@ const LogsPage: React.FC = () => {
                 </div>
             )}
 
-            {/* Monthly Detail Modal */}
-            {showMonthlyDetail && selectedEmployee && (
-                <div className="fixed inset-0 bg-white z-50 flex flex-col">
-                    <div className="p-4 border-b flex items-center gap-4">
-                        <button onClick={() => setShowMonthlyDetail(false)} className="p-2 hover:bg-gray-100 rounded-full">
-                            <ChevronLeft size={24} />
-                        </button>
-                        <h2 className="text-lg font-bold">Feuille de temps mensuelle</h2>
-                    </div>
-
-                    <div className="p-6 flex flex-col items-center border-b">
-                        <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-200 mb-4">
-                            {selectedEmployee.photo && <img src={selectedEmployee.photo} alt="" className="w-full h-full object-cover" />}
+            {/* Downloads Modal */}
+            {showDownloads && (
+                <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-slide-up">
+                        <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+                            <h2 className="font-bold text-gray-900 flex items-center gap-2">
+                                <Download size={20} className="text-orange-500" />
+                                Téléchargements récents
+                            </h2>
+                            <button onClick={() => setShowDownloads(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                                <X size={20} className="text-gray-500" />
+                            </button>
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900">{selectedEmployee.firstName} {selectedEmployee.lastName}</h3>
-                    </div>
-
-                    <div className="grid grid-cols-2 border-b">
-                        <div className="p-4 border-r text-center">
-                            <p className="text-xs text-gray-500 mb-1">Heures suivies</p>
-                            <p className="text-xl font-black text-gray-900">{formatDuration(currentMonthlyStat?.totalMinutes || 0)}</p>
-                        </div>
-                        <div className="p-4 text-center">
-                            <p className="text-xs text-gray-500 mb-1">Heures de paie</p>
-                            <p className="text-xl font-black text-gray-900">{formatDuration(currentMonthlyStat?.totalMinutes || 0)}</p>
-                        </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto">
-                        {monthlyDetailDays.map(day => {
-                            const dayKey = format(day, 'yyyy-MM-dd');
-                            const dayStat = currentMonthlyStat?.dailyBreakdown[dayKey];
-                            const isOff = isWeekend(day);
-
-                            return (
-                                <div key={dayKey} className="p-4 border-b flex justify-between items-center bg-white">
-                                    <div className="flex flex-col">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-bold text-gray-900 capitalize">{format(day, 'eee., MMM. d', { locale: fr })}</span>
-                                            {isOff && <span className="px-2 py-0.5 bg-gray-200 text-gray-600 text-[10px] font-bold rounded-full uppercase">Rest Day</span>}
-                                        </div>
-                                        <p className="text-xs text-gray-400 mt-1">
-                                            {dayStat ? `Total: ${formatDuration(dayStat.totalMinutes)}` : "N'a pas effectué le pointage d'arrivée"}
-                                        </p>
-                                    </div>
-                                    <ChevronRight size={20} className="text-gray-300" />
+                        <div className="p-4 max-h-[60vh] overflow-y-auto">
+                            {generatedFiles.length === 0 ? (
+                                <div className="text-center py-8 text-gray-500">
+                                    <FileSpreadsheet size={48} className="mx-auto mb-3 opacity-20" />
+                                    <p>Aucun fichier généré récemment.</p>
                                 </div>
-                            );
-                        })}
+                            ) : (
+                                <div className="space-y-3">
+                                    {generatedFiles.map((file, idx) => (
+                                        <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 rounded-2xl border border-gray-100">
+                                            <div className={`w-10 h-10 ${file.type === 'csv' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                                                {file.type === 'csv' ? <FileText size={20} /> : <FileSpreadsheet size={20} />}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-gray-900 truncate">{file.name}</p>
+                                                <p className="text-[10px] text-gray-500">{format(file.date, 'HH:mm', { locale: fr })} • {file.type.toUpperCase()}</p>
+                                            </div>
+                                            <button
+                                                onClick={() => {
+                                                    if (file.type === 'csv') {
+                                                        const link = document.createElement("a");
+                                                        link.href = URL.createObjectURL(file.data);
+                                                        link.setAttribute("download", file.name);
+                                                        document.body.appendChild(link);
+                                                        link.click();
+                                                        document.body.removeChild(link);
+                                                    } else {
+                                                        XLSX.writeFile(file.data, file.name);
+                                                    }
+                                                }}
+                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                            >
+                                                <Download size={18} />
+                                            </button>
+                                            <button
+                                                onClick={() => setGeneratedFiles(prev => prev.filter((_, i) => i !== idx))}
+                                                className="p-2 text-red-400 hover:bg-red-50 rounded-lg transition-colors"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 bg-gray-50 border-t text-center">
+                            <p className="text-[10px] text-gray-400">Les fichiers sont conservés temporairement pendant cette session.</p>
+                        </div>
                     </div>
                 </div>
             )}

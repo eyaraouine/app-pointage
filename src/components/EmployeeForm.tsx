@@ -5,21 +5,24 @@ import { useStore } from '../context/StoreContext';
 import { Camera, Save, RefreshCw, CheckCircle, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+import type { Employee } from '../types';
+
 interface EmployeeFormProps {
+    employeeToEdit?: Employee;
     onSuccess?: () => void;
 }
 
-const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess }) => {
-    const { employees, addEmployee, modelsLoaded, loadingError } = useStore();
+const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }) => {
+    const { employees, addEmployee, updateEmployee, modelsLoaded, loadingError } = useStore();
     const navigate = useNavigate();
     const webcamRef = useRef<Webcam>(null);
 
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
-    const [matricule, setMatricule] = useState('');
-    const [phone, setPhone] = useState('');
+    const [firstName, setFirstName] = useState(employeeToEdit?.firstName || '');
+    const [lastName, setLastName] = useState(employeeToEdit?.lastName || '');
+    const [matricule, setMatricule] = useState(employeeToEdit?.matricule || '');
+    const [phone, setPhone] = useState(employeeToEdit?.phone || '');
     const [isCapturing, setIsCapturing] = useState(false);
-    const [capturedImage, setCapturedImage] = useState<string | null>(null);
+    const [capturedImage, setCapturedImage] = useState<string | null>(employeeToEdit?.photo || null);
     const [processing, setProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showSuccess, setShowSuccess] = useState(false);
@@ -56,6 +59,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess }) => {
         try {
             // 1. Basic field checks (Name/Matricule)
             const nameExists = employees.some(emp =>
+                emp.id !== employeeToEdit?.id &&
                 emp.firstName.toLowerCase() === firstName.toLowerCase() &&
                 emp.lastName.toLowerCase() === lastName.toLowerCase()
             );
@@ -67,7 +71,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess }) => {
             }
 
             if (matricule) {
-                const matriculeExists = employees.some(emp => emp.matricule === matricule);
+                const matriculeExists = employees.some(emp => emp.id !== employeeToEdit?.id && emp.matricule === matricule);
                 if (matriculeExists) {
                     setError(`Le matricule ${matricule} est déjà utilisé.`);
                     setProcessing(false);
@@ -95,7 +99,8 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess }) => {
             }
 
             // 3. Face Duplicate Check
-            if (employees.length > 0) {
+            const hasNewPhoto = capturedImage !== employeeToEdit?.photo;
+            if (hasNewPhoto && employees.length > 0) {
                 const labeledDescriptors = employees.map(emp => {
                     return new faceapi.LabeledFaceDescriptors(
                         emp.id,
@@ -114,19 +119,23 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess }) => {
                 }
             }
 
-            // 4. Save employee
-            const newEmployee = {
-                id: '', // Will be set by Firestore
+            // 4. Save/Update employee
+            const employeeData = {
+                id: employeeToEdit?.id || '',
                 firstName,
                 lastName,
-                photoDescriptor: Array.from(detection.descriptor),
+                photoDescriptor: hasNewPhoto ? Array.from(detection.descriptor) : (employeeToEdit?.photoDescriptor || []),
                 photo: capturedImage,
                 matricule: matricule || "",
                 phone: phone || "",
-                role: 'employee' as const,
+                role: employeeToEdit?.role || 'employee' as const,
             };
 
-            await addEmployee(newEmployee);
+            if (employeeToEdit) {
+                await updateEmployee(employeeData);
+            } else {
+                await addEmployee(employeeData);
+            }
             setShowSuccess(true);
 
             setTimeout(() => {
@@ -153,7 +162,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess }) => {
                     <CheckCircle className="text-green-600" size={24} />
                     <div>
                         <p className="font-bold">Succès !</p>
-                        <p className="text-sm">L'employé {firstName} {lastName} a été ajouté.</p>
+                        <p className="text-sm">L'employé {firstName} {lastName} a été {employeeToEdit ? 'modifié' : 'ajouté'}.</p>
                     </div>
                 </div>
             )}
