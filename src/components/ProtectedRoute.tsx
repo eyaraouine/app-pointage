@@ -7,10 +7,13 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-    const { adminUser } = useStore();
+    const { adminUser, isKioskAdmin } = useStore();
     const location = useLocation();
 
-    if (!adminUser) {
+    // Fallback: Check localStorage directly to avoid race conditions with Context on reload
+    const storedAuth = localStorage.getItem('User_Access_Level') === 'ADMIN_MASTER';
+
+    if (!adminUser && !isKioskAdmin && !storedAuth) {
         // Redirect to login but save the current location to return after login
         return <Navigate to="/login" state={{ from: location }} replace />;
     }

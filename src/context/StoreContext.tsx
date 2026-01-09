@@ -43,6 +43,9 @@ interface StoreContextType {
     hasAdmin: boolean;
     modelsLoaded: boolean;
     loadingError: string | null;
+    isKioskAdmin: boolean;
+    enableKioskAdmin: () => void;
+    disableKioskAdmin: () => void;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -191,6 +194,26 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return undefined;
     };
 
+    // Kiosk Admin State Management
+    const [isKioskAdmin, setIsKioskAdmin] = useState(
+        () => localStorage.getItem('User_Access_Level') === 'ADMIN_MASTER'
+    );
+
+    const enableKioskAdmin = () => {
+        localStorage.setItem('User_Access_Level', 'ADMIN_MASTER');
+        localStorage.setItem('isAuthenticated', 'true');
+        setIsKioskAdmin(true);
+    };
+
+    const disableKioskAdmin = () => {
+        localStorage.removeItem('User_Access_Level');
+        localStorage.removeItem('isAuthenticated');
+        localStorage.removeItem('kiosk_admin_session');
+        setIsKioskAdmin(false);
+    };
+
+
+
     const hasAdmin = true;
 
     return (
@@ -214,7 +237,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             findAdminByPhone,
             hasAdmin,
             modelsLoaded,
-            loadingError
+            loadingError,
+            isKioskAdmin,
+            enableKioskAdmin,
+            disableKioskAdmin
         }}>
             {children}
         </StoreContext.Provider>

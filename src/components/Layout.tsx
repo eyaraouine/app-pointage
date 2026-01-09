@@ -7,11 +7,13 @@ import clsx from 'clsx';
 const Layout: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { adminUser, logoutAdmin } = useStore();
+    const { adminUser, logoutAdmin, isKioskAdmin, disableKioskAdmin } = useStore();
+    const storedAuth = localStorage.getItem('User_Access_Level') === 'ADMIN_MASTER';
+    const showAdminNav = adminUser || isKioskAdmin || storedAuth;
 
     const navItems = [
         { path: '/', icon: UserCheck, label: 'Pointer' },
-        ...(adminUser ? [
+        ...(showAdminNav ? [
             { path: '/admin/employees', icon: Users, label: 'Employés' },
             { path: '/admin/zones', icon: MapPin, label: 'Zones' },
             { path: '/admin/logs', icon: ClipboardList, label: 'Journal' },
@@ -19,7 +21,11 @@ const Layout: React.FC = () => {
     ];
 
     const handleLogout = () => {
-        logoutAdmin();
+        if (isKioskAdmin) {
+            disableKioskAdmin();
+        } else {
+            logoutAdmin();
+        }
         navigate('/login');
     };
 
@@ -27,11 +33,11 @@ const Layout: React.FC = () => {
         <div className="flex flex-col h-screen bg-gray-50">
             <header className="bg-blue-600 text-white p-4 shadow-md z-10 flex justify-between items-center">
                 <h1 className="text-xl font-bold">Pointage Mobile</h1>
-                {adminUser ? (
+                {showAdminNav ? (
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1 text-sm bg-blue-700 px-3 py-1 rounded-full">
                             <User size={14} />
-                            <span className="font-medium">{adminUser.name}</span>
+                            <span className="font-medium">{adminUser ? adminUser.name : 'Borne Admin'}</span>
                         </div>
                         <button
                             onClick={handleLogout}

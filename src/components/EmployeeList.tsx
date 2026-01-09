@@ -1,6 +1,6 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
-import { User, Trash2, Phone, Hash, Pencil } from 'lucide-react';
+import { User, Trash2, Hash, Pencil } from 'lucide-react';
 import type { Employee } from '../types';
 
 interface EmployeeListProps {
@@ -18,9 +18,17 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ onEdit }) => {
         );
     }
 
+    const sortedEmployees = [...employees].sort((a, b) => {
+        // Sort by isKiosk (true first), then by name
+        if (a.isKiosk === b.isKiosk) {
+            return a.firstName.localeCompare(b.firstName);
+        }
+        return a.isKiosk ? -1 : 1;
+    });
+
     return (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {employees.map((employee) => (
+            {sortedEmployees.map((employee) => (
                 <div key={employee.id} className="bg-white p-4 rounded-lg shadow flex items-center gap-4">
                     <div className="w-16 h-16 rounded-full overflow-hidden bg-blue-100 flex-shrink-0 border-2 border-blue-50">
                         {employee.photo ? (
@@ -34,21 +42,18 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ onEdit }) => {
                     <div>
                         <h4 className="font-semibold text-lg">{employee.firstName} {employee.lastName}</h4>
                         <div className="flex flex-wrap gap-2 mt-1">
-                            <span className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                {employee.role === 'admin' ? 'Administrateur' : 'Employé'}
-                            </span>
+                            {employee.isKiosk && (
+                                <span className="text-xs bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full flex items-center gap-1 font-medium">
+                                    Borne
+                                </span>
+                            )}
                             {employee.matricule && (
                                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full flex items-center gap-1">
                                     <Hash size={10} />
                                     {employee.matricule}
                                 </span>
                             )}
-                            {employee.phone && (
-                                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                    <Phone size={10} />
-                                    {employee.phone}
-                                </span>
-                            )}
+
                         </div>
                     </div>
                     <div className="ml-auto flex items-center gap-1">

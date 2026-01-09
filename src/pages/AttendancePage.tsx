@@ -5,18 +5,27 @@ import { useStore } from '../context/StoreContext';
 import { MapPin, CheckCircle, AlertTriangle } from 'lucide-react';
 import { getDistance } from 'geolib';
 
+import AdminAccessButton from '../components/AdminAccessButton';
+import AdminSuccessModal from '../components/AdminSuccessModal';
+
+
 const AttendancePage: React.FC = () => {
-    const { employees, zones, logs, addLog, modelsLoaded, loadingError } = useStore();
+    const { employees, zones, logs, addLog, modelsLoaded, loadingError, enableKioskAdmin } = useStore();
     const webcamRef = useRef<Webcam>(null);
+    // const navigate = useNavigate(); // Unused due to partial reload fix
 
     const [location, setLocation] = useState<{ lat: number, lng: number } | null>(null);
     const [currentZone, setCurrentZone] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [status, setStatus] = useState<'idle' | 'capturing' | 'processing' | 'success'>('idle');
-    const [matchedEmployee, setMatchedEmployee] = useState<string | null>(null);
+    const [matchedEmployee, setMatchedEmployee] = useState<string | null>(null); // For attendance
+    const [detectedKioskEmployee, setDetectedKioskEmployee] = useState<string | null>(null); // For Admin Modal name
     const [matchedPhoto, setMatchedPhoto] = useState<string | null>(null);
     const [lastLogType, setLastLogType] = useState<'check-in' | 'check-out' | null>(null);
     const [accuracy, setAccuracy] = useState<number | null>(null);
+    const [isAdminButtonVisible, setIsAdminButtonVisible] = useState(false);
+    const [showAdminSuccessModal, setShowAdminSuccessModal] = useState(false);
+    const scanningIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
 
     // Get Location
@@ -44,7 +53,8 @@ const AttendancePage: React.FC = () => {
                     lng: longitude,
                 });
                 setAccuracy(accuracy);
-                setError(null);
+                // Only clear error if it was a GPS error, not a face error
+                setError(prev => (prev?.includes("Localisation") ? null : prev));
             },
             (err) => {
                 console.error("❌ GPS ERROR:", err);
@@ -89,6 +99,129 @@ const AttendancePage: React.FC = () => {
             setCurrentZone(foundZone ? foundZone.name : null);
         }
     }, [location, zones]);
+
+
+    // Continuous Face Scanning for Kiosk Admin
+    useEffect(() => {
+        if (!modelsLoaded || status === 'processing' || status === 'success') {
+            if (scanningIntervalRef.current) clearInterval(scanningIntervalRef.current);
+            return;
+        }
+
+        const yawHistory: number[] = [];
+        const HISTORY_SIZE = 5;
+        const MOVEMENT_THRESHOLD = 0.2; // Significant movement required
+
+        const scanFace = async () => {
+            if (!webcamRef.current?.video || !webcamRef.current.getScreenshot()) return;
+
+            try {
+                const videoEl = webcamRef.current.video;
+                if (videoEl.paused || videoEl.ended) return;
+
+                const detection = await faceapi.detectSingleFace(
+                    videoEl,
+                    new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
+                ).withFaceLandmarks().withFaceDescriptor();
+
+                if (!detection) {
+                    setIsAdminButtonVisible(false);
+                    yawHistory.length = 0;
+                    return;
+                }
+
+                const landmarks = detection.landmarks;
+                const nose = landmarks.getNose()[3];
+                const leftEye = landmarks.getLeftEye()[0];
+                const rightEye = landmarks.getRightEye()[3];
+
+                const noseX = nose.x;
+                const leftEyeX = leftEye.x;
+                const rightEyeX = rightEye.x;
+
+                const dLeft = Math.abs(noseX - leftEyeX);
+                const dRight = Math.abs(rightEyeX - noseX);
+
+                const ratio = dLeft / (dRight + 0.001);
+
+                const labeledDescriptors = employees.map(emp =>
+                    new faceapi.LabeledFaceDescriptors(emp.id, [new Float32Array(emp.photoDescriptor)])
+                );
+
+                if (labeledDescriptors.length === 0) return;
+
+                const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
+                const match = faceMatcher.findBestMatch(detection.descriptor);
+
+                if (match.label !== 'unknown') {
+                    const employee = employees.find(e => e.id === match.label);
+                    if (employee && employee.isKiosk) {
+                        // Authenticated as Kiosk. Now Check Liveness.
+                        yawHistory.push(ratio);
+                        if (yawHistory.length > HISTORY_SIZE) yawHistory.shift();
+
+                        if (yawHistory.length >= HISTORY_SIZE) {
+                            const min = Math.min(...yawHistory);
+                            const max = Math.max(...yawHistory);
+                            const diff = max - min;
+
+                            if (diff > MOVEMENT_THRESHOLD) {
+                                if (!isAdminButtonVisible) { // Only set if not already visible to avoid spam
+                                    setDetectedKioskEmployee(`${employee.firstName} ${employee.lastName}`);
+                                    setIsAdminButtonVisible(true);
+                                }
+                            }
+                        }
+                    } else {
+                        setIsAdminButtonVisible(false);
+                        yawHistory.length = 0;
+                        setDetectedKioskEmployee(null);
+                    }
+                } else {
+                    setIsAdminButtonVisible(false);
+                    yawHistory.length = 0;
+                    setDetectedKioskEmployee(null);
+                }
+
+            } catch (err) {
+                console.error("Auto-scan error (silent):", err);
+            }
+        };
+
+        // Scan somewhat frequently (e.g. 200ms) to capture movement smoothy
+        scanningIntervalRef.current = setInterval(scanFace, 200);
+
+        return () => {
+            if (scanningIntervalRef.current) clearInterval(scanningIntervalRef.current);
+        };
+    }, [modelsLoaded, employees, status, isAdminButtonVisible]); // Added isAdminButtonVisible to deps to avoid stale closure if needed, though setState is safe
+
+
+    const handleAdminAccess = () => {
+        console.log("Admin Access Triggered for Kiosk");
+
+        // 1. Elevate Privileges (using Store for reactivity)
+        enableKioskAdmin();
+
+        // Mock admin session data if needed (Store handles the main flag)
+        const adminSession = {
+            timestamp: new Date().toISOString(),
+            role: 'admin',
+            source: 'kiosk_face_auth'
+        };
+        localStorage.setItem('kiosk_admin_session', JSON.stringify(adminSession));
+
+        // 2. Show Success Modal
+        setShowAdminSuccessModal(true);
+    };
+
+    const handleModalClose = () => {
+        setShowAdminSuccessModal(false);
+        // Force a hard reload to ensure Layout and StoreContext pick up the new localStorage state
+        // This fixes the issue where the bottom navigation doesn't appear immediately
+        window.location.href = '/admin/employees';
+    };
+
 
     const handlePointage = async () => {
         if (!webcamRef.current || !modelsLoaded || !currentZone) return;
@@ -242,7 +375,19 @@ const AttendancePage: React.FC = () => {
     }
 
     return (
-        <div className="flex flex-col h-full p-4 max-w-md mx-auto">
+        <div className="flex flex-col h-full p-4 max-w-md mx-auto relative">
+            <AdminAccessButton
+                isVisible={isAdminButtonVisible}
+                onClick={handleAdminAccess}
+            />
+            {detectedKioskEmployee && (
+                <AdminSuccessModal
+                    isOpen={showAdminSuccessModal}
+                    onClose={handleModalClose}
+                    employeeName={detectedKioskEmployee}
+                />
+            )}
+
             <div className="bg-white p-4 rounded-lg shadow-sm mb-4">
                 <div className="flex items-center gap-3 text-gray-700 mb-2">
                     <MapPin className={currentZone ? "text-blue-600" : "text-red-500"} />
@@ -273,13 +418,14 @@ const AttendancePage: React.FC = () => {
             </div>
 
             <div className="flex-1 flex flex-col items-center justify-center">
-                <div className="relative w-full aspect-[3/4] bg-black rounded-2xl overflow-hidden shadow-xl mb-6">
+                <div className="relative w-full max-w-[300px] aspect-square bg-black rounded-2xl overflow-hidden shadow-xl mb-4">
                     <Webcam
                         audio={false}
                         ref={webcamRef}
                         screenshotFormat="image/jpeg"
                         className="w-full h-full object-cover"
                         videoConstraints={{ facingMode: "user" }}
+                        mirrored={true}
                     />
 
                     {/* Face Overlay Guide */}

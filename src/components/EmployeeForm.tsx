@@ -21,6 +21,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
     const [lastName, setLastName] = useState(employeeToEdit?.lastName || '');
     const [matricule, setMatricule] = useState(employeeToEdit?.matricule || '');
     const [phone, setPhone] = useState(employeeToEdit?.phone || '');
+    const [isKiosk, setIsKiosk] = useState(employeeToEdit?.isKiosk || false);
     const [isCapturing, setIsCapturing] = useState(false);
     const [capturedImage, setCapturedImage] = useState<string | null>(employeeToEdit?.photo || null);
     const [processing, setProcessing] = useState(false);
@@ -129,6 +130,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
                 matricule: matricule || "",
                 phone: phone || "",
                 role: employeeToEdit?.role || 'employee' as const,
+                isKiosk,
             };
 
             if (employeeToEdit) {
@@ -210,6 +212,19 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
                             className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
                             placeholder="Ex: 22 123 456"
                         />
+                    </div>
+
+                    <div className="flex items-center gap-2 mt-2">
+                        <input
+                            type="checkbox"
+                            id="isKiosk"
+                            checked={isKiosk}
+                            onChange={(e) => setIsKiosk(e.target.checked)}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <label htmlFor="isKiosk" className="text-sm font-medium text-gray-700">
+                            Borne de pointage
+                        </label>
                     </div>
                 </div>
 
