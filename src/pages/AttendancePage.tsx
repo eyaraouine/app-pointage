@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import Webcam from 'react-webcam';
 import * as faceapi from 'face-api.js';
 import { useStore } from '../context/StoreContext';
-import { MapPin, CheckCircle, AlertTriangle } from 'lucide-react';
+import { MapPin, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { getDistance } from 'geolib';
+import { playSuccessBeep } from '../utils/sound';
 
 import AdminAccessButton from '../components/AdminAccessButton';
 import AdminSuccessModal from '../components/AdminSuccessModal';
@@ -25,6 +26,7 @@ const AttendancePage: React.FC = () => {
     const [accuracy, setAccuracy] = useState<number | null>(null);
     const [isAdminButtonVisible, setIsAdminButtonVisible] = useState(false);
     const [showAdminSuccessModal, setShowAdminSuccessModal] = useState(false);
+
     const scanningIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
 
@@ -224,28 +226,45 @@ const AttendancePage: React.FC = () => {
 
 
     const handlePointage = async () => {
+
+
         if (!webcamRef.current || !modelsLoaded || !currentZone) return;
         setStatus('processing');
         setError(null);
 
         try {
-            const imageSrc = webcamRef.current.getScreenshot();
-            if (!imageSrc) {
-                throw new Error("Impossible de capturer la photo.");
+            let detection = null;
+            let attempt = 0;
+            const MAX_RETRIES = 3;
+
+            // Retry loop to handle varying lighting/angles
+            while (attempt < MAX_RETRIES && !detection) {
+                attempt++;
+                const imageSrc = webcamRef.current.getScreenshot();
+                if (!imageSrc) {
+                    if (attempt === MAX_RETRIES) throw new Error("Impossible de capturer la photo.");
+                    // If imageSrc is null, and not the last attempt, continue to next attempt
+                    await new Promise(r => setTimeout(r, 200)); // Small delay before retry
+                    continue;
+                }
+
+                // finalImageSrc = imageSrc; // Store the imageSrc for the current attempt
+
+                const currentImg = new Image();
+                currentImg.src = imageSrc;
+                await new Promise((resolve) => currentImg.onload = resolve);
+
+                // Detect face with SsdMobilenetv1 with permissive threshold
+                detection = await faceapi.detectSingleFace(
+                    currentImg,
+                    new faceapi.SsdMobilenetv1Options({ minConfidence: 0.2 })
+                ).withFaceLandmarks().withFaceDescriptor();
+
+                if (!detection && attempt < MAX_RETRIES) {
+                    // Small cooling off before retry
+                    await new Promise(r => setTimeout(r, 200));
+                }
             }
-
-            const img = new Image();
-            img.src = imageSrc;
-            await new Promise((resolve, reject) => {
-                img.onload = resolve;
-                img.onerror = () => reject(new Error("Impossible de charger l'image capturée."));
-            });
-
-            // Detect face with TinyFaceDetector
-            const detection = await faceapi.detectSingleFace(
-                img,
-                new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 })
-            ).withFaceLandmarks().withFaceDescriptor();
 
             if (!detection) {
                 setError("Aucun visage détecté. Assurez-vous d'être bien éclairé et face caméra.");
@@ -313,6 +332,9 @@ const AttendancePage: React.FC = () => {
                     zoneName: zoneAtMoment ? zoneAtMoment.name : (currentZone || undefined)
                 });
 
+                // Play success sound
+                playSuccessBeep();
+
                 setStatus('success');
                 setTimeout(() => {
                     setStatus('idle');
@@ -331,14 +353,28 @@ const AttendancePage: React.FC = () => {
 
     if (!modelsLoaded) {
         return (
-            <div className="p-8 text-center">
+            <div className="flex flex-col items-center justify-center h-full p-8 text-center animate-in fade-in duration-500">
                 {loadingError ? (
-                    <div className="text-red-600 bg-red-50 p-4 rounded-lg">
-                        <AlertTriangle className="mx-auto mb-2" />
-                        {loadingError}
+                    <div className="text-red-600 bg-red-50 p-6 rounded-xl shadow-sm max-w-xs">
+                        <AlertTriangle className="mx-auto mb-3 h-10 w-10" />
+                        <p className="font-medium">{loadingError}</p>
                     </div>
                 ) : (
-                    "Chargement des modèles IA..."
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="relative">
+                            <div className="w-16 h-16 border-4 border-blue-100 rounded-full animate-spin border-t-blue-600"></div>
+                            <Loader2 className="absolute inset-0 m-auto text-blue-600 animate-pulse" size={24} />
+                        </div>
+                        <div className="space-y-2">
+                            <h3 className="text-xl font-semibold text-gray-800">Initialisation IA</h3>
+                            <p className="text-sm text-gray-500">Chargement des modèles de reconnaissance...</p>
+                        </div>
+
+                        {/* Skeleton mimicking webcam view */}
+                        <div className="mt-8 w-64 h-64 bg-gray-100 rounded-2xl animate-pulse flex items-center justify-center border-2 border-gray-200 border-dashed">
+                            <div className="text-gray-300">Caméra en attente</div>
+                        </div>
+                    </div>
                 )}
             </div>
         );

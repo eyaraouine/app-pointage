@@ -39,4 +39,6 @@ export interface AdminUser {
     username: string;
     password?: string; // Only used during login/register, not stored in state
     name: string;
+    role?: 'ADMIN' | 'SUPER_ADMIN';
+    suspended?: boolean;
 }

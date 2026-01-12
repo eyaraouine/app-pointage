@@ -46,6 +46,12 @@ interface StoreContextType {
     isKioskAdmin: boolean;
     enableKioskAdmin: () => void;
     disableKioskAdmin: () => void;
+    // Super Admin Features
+    getAllAdmins: () => Promise<AdminUser[]>;
+    toggleAdminSuspend: (id: string, suspended: boolean) => Promise<void>;
+    impersonateAdmin: (adminId: string) => Promise<void>;
+    exitImpersonation: () => void;
+    superAdminSession: AdminUser | null;
 }
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
@@ -55,6 +61,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [zones, setZones] = useState<Zone[]>([]);
     const [logs, setLogs] = useState<AttendanceLog[]>([]);
     const [adminUser, setAdminUser] = useState<AdminUser | null>(null);
+    const [superAdminSession, setSuperAdminSession] = useState<AdminUser | null>(null);
     const [modelsLoaded, setModelsLoaded] = useState(false);
     const [loadingError, setLoadingError] = useState<string | null>(null);
 
@@ -156,7 +163,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const loginAdmin = async (email: string, password: string) => {
         try {
-            await signInWithEmailAndPassword(auth, email, password);
+            // Mapping special username to email if necessary
+            const targetEmail = email === 'glorysmartech' ? 'glorysmart.tech@gmail.com' : email;
+
+            await signInWithEmailAndPassword(auth, targetEmail, password);
             return true;
         } catch (error) {
             console.error('Login error:', error);
@@ -212,9 +222,63 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setIsKioskAdmin(false);
     };
 
+    // Security: invalidates session on background
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden' && isKioskAdmin) {
+                console.log("App backgrounded, revoking kiosk session.");
+                disableKioskAdmin();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [isKioskAdmin]);
+
 
 
     const hasAdmin = true;
+
+    // Super Admin Actions
+    const getAllAdmins = async () => {
+        const querySnapshot = await getDocs(collection(db, 'admins'));
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AdminUser));
+    };
+
+    const toggleAdminSuspend = async (id: string, suspended: boolean) => {
+        await updateDoc(doc(db, 'admins', id), { suspended });
+    };
+
+    const impersonateAdmin = async (adminId: string) => {
+        // 1. Save current session (Super Admin)
+        if (adminUser && adminUser.role === 'SUPER_ADMIN') {
+            setSuperAdminSession(adminUser);
+        }
+
+        // 2. Fetch target admin
+        const adminDoc = await import('firebase/firestore').then(mod => mod.getDoc(doc(db, 'admins', adminId)));
+        if (adminDoc.exists()) {
+            const targetAdmin = { id: adminDoc.id, ...adminDoc.data() } as AdminUser;
+            setAdminUser(targetAdmin);
+            // Ensure access level is set for routing (mocking the role temporarily)
+            // We rely on component level checks or just context state
+        }
+    };
+
+    const exitImpersonation = () => {
+        if (superAdminSession) {
+            setAdminUser(superAdminSession);
+            setSuperAdminSession(null);
+        }
+    };
+
+    // Auto-detect Super Admin Role on Auth Change
+    useEffect(() => {
+        if (adminUser?.email === 'glorysmart.tech@gmail.com' && adminUser.role !== 'SUPER_ADMIN') {
+            // Forcing role update in local state and potentially DB if missing
+            const updatedUser = { ...adminUser, role: 'SUPER_ADMIN' as const };
+            setAdminUser(updatedUser);
+        }
+    }, [adminUser?.email]);
 
     return (
         <StoreContext.Provider value={{
@@ -240,7 +304,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             loadingError,
             isKioskAdmin,
             enableKioskAdmin,
-            disableKioskAdmin
+            disableKioskAdmin,
+            // Super Admin
+            getAllAdmins,
+            toggleAdminSuspend,
+            impersonateAdmin,
+            exitImpersonation,
+            superAdminSession
         }}>
             {children}
         </StoreContext.Provider>

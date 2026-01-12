@@ -1,19 +1,24 @@
-import React from 'react';
 import { useNavigate, Outlet, Link, useLocation } from 'react-router-dom';
-import { Users, MapPin, ClipboardList, UserCheck, LogOut, LogIn, User } from 'lucide-react';
+import { Users, MapPin, ClipboardList, UserCheck, LogOut, LogIn, User, House, Shield, Activity, X } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import clsx from 'clsx';
 
 const Layout: React.FC = () => {
     const location = useLocation();
     const navigate = useNavigate();
-    const { adminUser, logoutAdmin, isKioskAdmin, disableKioskAdmin } = useStore();
+    const { adminUser, logoutAdmin, isKioskAdmin, disableKioskAdmin, superAdminSession, exitImpersonation } = useStore();
     const storedAuth = localStorage.getItem('User_Access_Level') === 'ADMIN_MASTER';
     const showAdminNav = adminUser || isKioskAdmin || storedAuth;
+    const isSuperAdmin = adminUser?.role === 'SUPER_ADMIN';
+    const isImpersonating = !!superAdminSession;
 
     const navItems = [
+        { path: '/home', icon: House, label: 'Accueil' },
         { path: '/', icon: UserCheck, label: 'Pointer' },
-        ...(showAdminNav ? [
+        ...(isSuperAdmin ? [
+            { path: '/super-admin/dashboard', icon: Activity, label: 'Global' },
+            { path: '/super-admin/instances', icon: Shield, label: 'Instances' },
+        ] : showAdminNav ? [
             { path: '/admin/employees', icon: Users, label: 'Employés' },
             { path: '/admin/zones', icon: MapPin, label: 'Zones' },
             { path: '/admin/logs', icon: ClipboardList, label: 'Journal' },
@@ -31,7 +36,22 @@ const Layout: React.FC = () => {
 
     return (
         <div className="flex flex-col h-screen bg-gray-50">
-            <header className="bg-blue-600 text-white p-4 shadow-md z-10 flex justify-between items-center">
+            {isImpersonating && (
+                <div className="bg-amber-500 text-white px-4 py-2 text-sm font-bold flex justify-between items-center shadow-md">
+                    <span className="flex items-center gap-2">
+                        <Shield size={16} />
+                        Mode Super Admin : Connecté en tant que {adminUser?.name}
+                    </span>
+                    <button
+                        onClick={() => { exitImpersonation(); navigate('/super-admin/instances'); }}
+                        className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-lg text-xs flex items-center gap-1 transition-colors"
+                    >
+                        <X size={14} />
+                        Quitter
+                    </button>
+                </div>
+            )}
+            <header className={clsx("text-white p-4 shadow-md z-10 flex justify-between items-center", isSuperAdmin ? "bg-gray-900" : "bg-blue-600")}>
                 <h1 className="text-xl font-bold">Pointage Mobile</h1>
                 {showAdminNav ? (
                     <div className="flex items-center gap-3">
