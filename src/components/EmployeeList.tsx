@@ -1,13 +1,14 @@
 import React from 'react';
 import { useStore } from '../context/StoreContext';
-import { User, Trash2, Hash, Pencil } from 'lucide-react';
+import { User, Trash2, Hash, Pencil, Settings, CalendarCheck } from 'lucide-react';
 import type { Employee } from '../types';
 
 interface EmployeeListProps {
     onEdit: (employee: Employee) => void;
+    onSetSchedule: (employee: Employee) => void;
 }
 
-const EmployeeList: React.FC<EmployeeListProps> = ({ onEdit }) => {
+const EmployeeList: React.FC<EmployeeListProps> = ({ onEdit, onSetSchedule }) => {
     const { employees, deleteEmployee } = useStore();
 
     if (employees.length === 0) {
@@ -53,10 +54,22 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ onEdit }) => {
                                     {employee.matricule}
                                 </span>
                             )}
-
+                            {employee.hasCustomSchedule && (
+                                <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full flex items-center gap-1 font-bold border border-blue-100">
+                                    <CalendarCheck size={10} />
+                                    PLANNIG SPÉCIFIQUE
+                                </span>
+                            )}
                         </div>
                     </div>
                     <div className="ml-auto flex items-center gap-1">
+                        <button
+                            onClick={() => onSetSchedule(employee)}
+                            className="p-2 text-gray-400 hover:text-orange-600 transition-colors"
+                            title="Planning spécifique"
+                        >
+                            <Settings size={20} />
+                        </button>
                         <button
                             onClick={() => onEdit(employee)}
                             className="p-2 text-gray-400 hover:text-blue-600 transition-colors"

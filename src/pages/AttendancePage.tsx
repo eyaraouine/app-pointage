@@ -5,18 +5,19 @@ import { useStore } from '../context/StoreContext';
 import { MapPin, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { getDistance } from 'geolib';
 import { playSuccessBeep } from '../utils/sound';
+import type { Zone } from '../types';
 
 import AdminAccessButton from '../components/AdminAccessButton';
 import AdminSuccessModal from '../components/AdminSuccessModal';
 
 
 const AttendancePage: React.FC = () => {
-    const { employees, zones, logs, addLog, modelsLoaded, loadingError, enableKioskAdmin } = useStore();
+    const { employees, zones, logs, addLog, modelsLoaded, loadingError, enableKioskAdmin, setDetectedAdminId } = useStore();
     const webcamRef = useRef<Webcam>(null);
     // const navigate = useNavigate(); // Unused due to partial reload fix
 
     const [location, setLocation] = useState<{ lat: number, lng: number } | null>(null);
-    const [currentZone, setCurrentZone] = useState<string | null>(null);
+    const [currentZone, setCurrentZone] = useState<Zone | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [status, setStatus] = useState<'idle' | 'capturing' | 'processing' | 'success'>('idle');
     const [matchedEmployee, setMatchedEmployee] = useState<string | null>(null); // For attendance
@@ -98,9 +99,16 @@ const AttendancePage: React.FC = () => {
                 const GPS_TOLERANCE = 30; // mètres
                 return dist <= zone.radius + GPS_TOLERANCE;
             });
-            setCurrentZone(foundZone ? foundZone.name : null);
+
+            if (foundZone) {
+                setCurrentZone(foundZone);
+                setDetectedAdminId(foundZone.adminId || null);
+            } else {
+                setCurrentZone(null);
+                setDetectedAdminId(null);
+            }
         }
-    }, [location, zones]);
+    }, [location, zones, setDetectedAdminId]);
 
 
     // Continuous Face Scanning for Kiosk Admin
@@ -199,22 +207,51 @@ const AttendancePage: React.FC = () => {
     }, [modelsLoaded, employees, status, isAdminButtonVisible]); // Added isAdminButtonVisible to deps to avoid stale closure if needed, though setState is safe
 
 
-    const handleAdminAccess = () => {
+    const handleAdminAccess = async () => {
         console.log("Admin Access Triggered for Kiosk");
 
-        // 1. Elevate Privileges (using Store for reactivity)
-        enableKioskAdmin();
+        if (!webcamRef.current?.video || !modelsLoaded) return;
 
-        // Mock admin session data if needed (Store handles the main flag)
-        const adminSession = {
-            timestamp: new Date().toISOString(),
-            role: 'admin',
-            source: 'kiosk_face_auth'
-        };
-        localStorage.setItem('kiosk_admin_session', JSON.stringify(adminSession));
+        try {
+            const videoEl = webcamRef.current.video;
+            const detection = await faceapi.detectSingleFace(
+                videoEl,
+                new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
+            ).withFaceLandmarks().withFaceDescriptor();
 
-        // 2. Show Success Modal
-        setShowAdminSuccessModal(true);
+            if (detection) {
+                const labeledDescriptors = employees.map(emp =>
+                    new faceapi.LabeledFaceDescriptors(emp.id, [new Float32Array(emp.photoDescriptor)])
+                );
+
+                if (labeledDescriptors.length === 0) return;
+
+                const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.6);
+                const match = faceMatcher.findBestMatch(detection.descriptor);
+
+                if (match.label !== 'unknown') {
+                    const employee = employees.find(e => e.id === match.label);
+                    if (employee) {
+                        // 1. Elevate Privileges
+                        enableKioskAdmin(employee.adminId);
+
+                        // Mock admin session data
+                        const adminSession = {
+                            timestamp: new Date().toISOString(),
+                            role: 'admin',
+                            source: 'kiosk_face_auth',
+                            adminId: employee.adminId
+                        };
+                        localStorage.setItem('kiosk_admin_session', JSON.stringify(adminSession));
+
+                        // 2. Show Success Modal
+                        setShowAdminSuccessModal(true);
+                    }
+                }
+            }
+        } catch (err) {
+            console.error("Admin Access detect error:", err);
+        }
     };
 
     const handleModalClose = () => {
@@ -273,9 +310,19 @@ const AttendancePage: React.FC = () => {
             }
 
             // Match face
+            // Filter employees by zone for extreme speed and precision
+            const zoneEmployees = employees.filter(emp =>
+                !emp.assignedZoneId || emp.assignedZoneId === currentZone?.id
+            );
+
+            if (zoneEmployees.length === 0) {
+                setError("Aucun employé rattaché à ce site.");
+                setStatus('idle');
+                return;
+            }
 
             // Create FaceMatcher
-            const labeledDescriptors = employees.map(emp => {
+            const labeledDescriptors = zoneEmployees.map(emp => {
                 return new faceapi.LabeledFaceDescriptors(
                     emp.id,
                     [new Float32Array(emp.photoDescriptor)]
@@ -311,15 +358,6 @@ const AttendancePage: React.FC = () => {
                 const newType = (!lastLog || lastLog.type === 'check-out') ? 'check-in' : 'check-out';
                 setLastLogType(newType);
 
-                // Re-calculate zone at the exact moment of pointage for reliability
-                const zoneAtMoment = zones.find(zone => {
-                    const dist = getDistance(
-                        { latitude: location!.lat, longitude: location!.lng },
-                        { latitude: zone.lat, longitude: zone.lng }
-                    );
-                    return dist <= zone.radius + 30;
-                });
-
                 // Log attendance
                 addLog({
                     id: crypto.randomUUID(),
@@ -329,7 +367,7 @@ const AttendancePage: React.FC = () => {
                     location: location || { lat: 0, lng: 0 },
                     verified: true,
                     method: 'face_geo',
-                    zoneName: zoneAtMoment ? zoneAtMoment.name : (currentZone || undefined)
+                    zoneName: currentZone?.name
                 });
 
                 // Play success sound
@@ -404,7 +442,7 @@ const AttendancePage: React.FC = () => {
                 </div>
                 <p className="text-sm text-gray-500 mt-4">
                     {new Date().toLocaleString()} <br />
-                    {currentZone}
+                    {currentZone?.name}
                 </p>
             </div>
         );
@@ -428,7 +466,7 @@ const AttendancePage: React.FC = () => {
                 <div className="flex items-center gap-3 text-gray-700 mb-2">
                     <MapPin className={currentZone ? "text-blue-600" : "text-red-500"} />
                     <span className={`font-medium ${!currentZone && location ? "text-red-600" : ""}`}>
-                        {location ? (currentZone || "Hors zone autorisée") : "Recherche position..."}
+                        {location ? (currentZone?.name || "Hors zone autorisée") : "Recherche position..."}
                     </span>
                 </div>
                 {!currentZone && location && (

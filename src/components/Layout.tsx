@@ -1,5 +1,5 @@
 import { useNavigate, Outlet, Link, useLocation } from 'react-router-dom';
-import { Users, MapPin, ClipboardList, UserCheck, LogOut, LogIn, User, House, Shield, Activity, X } from 'lucide-react';
+import { Users, MapPin, ClipboardList, UserCheck, LogOut, LogIn, User, House, Shield, Activity, X, BarChart2 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import clsx from 'clsx';
 
@@ -22,6 +22,7 @@ const Layout: React.FC = () => {
             { path: '/admin/employees', icon: Users, label: 'Employés' },
             { path: '/admin/zones', icon: MapPin, label: 'Zones' },
             { path: '/admin/logs', icon: ClipboardList, label: 'Journal' },
+            { path: '/admin/analyses', icon: BarChart2, label: 'Analyses' },
         ] : []),
     ];
 

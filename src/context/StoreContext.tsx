@@ -20,7 +20,7 @@ import {
     getDocs
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import type { Employee, Zone, AttendanceLog, AdminUser } from '../types';
+import type { Employee, Zone, AttendanceLog, AdminUser, Schedule } from '../types';
 
 interface StoreContextType {
     employees: Employee[];
@@ -44,7 +44,7 @@ interface StoreContextType {
     modelsLoaded: boolean;
     loadingError: string | null;
     isKioskAdmin: boolean;
-    enableKioskAdmin: () => void;
+    enableKioskAdmin: (adminId?: string) => void;
     disableKioskAdmin: () => void;
     // Super Admin Features
     getAllAdmins: () => Promise<AdminUser[]>;
@@ -52,7 +52,24 @@ interface StoreContextType {
     impersonateAdmin: (adminId: string) => Promise<void>;
     exitImpersonation: () => void;
     superAdminSession: AdminUser | null;
+    // Planning
+    globalSchedule: Schedule | null;
+    updateGlobalSchedule: (schedule: Schedule) => Promise<void>;
+    setDetectedAdminId: (adminId: string | null) => void;
 }
+
+const DEFAULT_SCHEDULE: Schedule = {
+    modality: 'fixed',
+    workingDays: {
+        monday: { isActive: true, start: '09:00', end: '17:00' },
+        tuesday: { isActive: true, start: '09:00', end: '17:00' },
+        wednesday: { isActive: true, start: '09:00', end: '17:00' },
+        thursday: { isActive: true, start: '09:00', end: '17:00' },
+        friday: { isActive: true, start: '09:00', end: '17:00' },
+        saturday: { isActive: false, start: '09:00', end: '17:00' },
+        sunday: { isActive: false, start: '09:00', end: '17:00' },
+    }
+};
 
 const StoreContext = createContext<StoreContextType | undefined>(undefined);
 
@@ -64,6 +81,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [superAdminSession, setSuperAdminSession] = useState<AdminUser | null>(null);
     const [modelsLoaded, setModelsLoaded] = useState(false);
     const [loadingError, setLoadingError] = useState<string | null>(null);
+    const [globalSchedule, setGlobalSchedule] = useState<Schedule | null>(null);
+    const [kioskAdminId, setKioskAdminId] = useState<string | null>(
+        () => localStorage.getItem('kiosk_admin_id')
+    );
+    const [detectedAdminId, setDetectedAdminId] = useState<string | null>(null);
 
     // Load models
     useEffect(() => {
@@ -87,45 +109,92 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         loadModels();
     }, []);
 
-    // Real-time listeners for Firestore
+    // 1. Global Zones Listener (Public - for attendance)
     useEffect(() => {
-        const unsubEmployees = onSnapshot(collection(db, 'employees'), (snapshot) => {
-            setEmployees(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee)));
-        });
-
         const unsubZones = onSnapshot(collection(db, 'zones'), (snapshot) => {
-            setZones(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Zone)));
+            const allZones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Zone));
+            console.log("📍 Public Zones Loaded:", allZones.length);
+            setZones(allZones);
+        });
+        return () => unsubZones();
+    }, []);
+
+    // 2. Conditional Listeners for Employees and Logs
+    useEffect(() => {
+        // Preference: Logged in Admin > Kiosk Admin > Detected Zone Admin (Public)
+        const effectiveAdminId = adminUser?.id || kioskAdminId || detectedAdminId;
+
+        if (!effectiveAdminId) {
+            setEmployees([]);
+            setLogs([]);
+            return;
+        }
+
+        const qEmployees = query(collection(db, 'employees'), where('adminId', '==', effectiveAdminId));
+        const unsubEmployees = onSnapshot(qEmployees, (snapshot) => {
+            const fetchedEmployees = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Employee));
+            console.log("👥 Employees Loaded for Admin:", effectiveAdminId, fetchedEmployees.length);
+            setEmployees(fetchedEmployees);
         });
 
-        const unsubLogs = onSnapshot(collection(db, 'logs'), (snapshot) => {
+        const qLogs = query(collection(db, 'logs'), where('adminId', '==', effectiveAdminId));
+        const unsubLogs = onSnapshot(qLogs, (snapshot) => {
             setLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AttendanceLog)));
         });
 
-        const unsubAuth = onAuthStateChanged(auth, (user) => {
+        const unsubSettings = onSnapshot(doc(db, 'settings', `schedule_${effectiveAdminId}`), (snapshot) => {
+            if (snapshot.exists()) {
+                setGlobalSchedule(snapshot.data() as Schedule);
+            } else {
+                setGlobalSchedule(DEFAULT_SCHEDULE);
+            }
+        });
+
+        return () => {
+            unsubEmployees();
+            unsubLogs();
+            unsubSettings();
+        };
+    }, [adminUser?.id, kioskAdminId]);
+
+    // Independent Auth Listener
+    useEffect(() => {
+        const unsubAuth = onAuthStateChanged(auth, async (user) => {
             if (user) {
+                // Fetch additional admin data (role, suspended, etc.)
+                const { getDoc } = await import('firebase/firestore');
+                const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+                const adminData = adminDoc.exists() ? adminDoc.data() : {};
+
+                if (adminData.suspended) {
+                    await signOut(auth);
+                    setAdminUser(null);
+                    return;
+                }
+
                 setAdminUser({
                     id: user.uid,
                     email: user.email || '',
-                    username: user.displayName || '',
-                    name: user.displayName || '',
-                    phone: user.phoneNumber || ''
+                    username: adminData.username || user.displayName || '',
+                    name: adminData.name || user.displayName || '',
+                    phone: adminData.phone || '',
+                    role: adminData.role,
+                    suspended: adminData.suspended
                 });
             } else {
                 setAdminUser(null);
             }
         });
 
-        return () => {
-            unsubEmployees();
-            unsubZones();
-            unsubLogs();
-            unsubAuth();
-        };
+        return () => unsubAuth();
     }, []);
 
     const addEmployee = async (employee: Employee) => {
         const { id, ...data } = employee;
-        await addDoc(collection(db, 'employees'), data);
+        await addDoc(collection(db, 'employees'), {
+            ...data,
+            adminId: adminUser?.id
+        });
     };
 
     const updateEmployee = async (employee: Employee) => {
@@ -140,7 +209,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const addZone = async (zone: Zone) => {
         const { id, ...data } = zone;
-        await addDoc(collection(db, 'zones'), data);
+        await addDoc(collection(db, 'zones'), {
+            ...data,
+            adminId: adminUser?.id
+        });
     };
 
     const deleteZone = async (id: string) => {
@@ -154,7 +226,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const addLog = async (log: AttendanceLog) => {
         const { id, ...data } = log;
-        await addDoc(collection(db, 'logs'), data);
+        await addDoc(collection(db, 'logs'), {
+            ...data,
+            adminId: adminUser?.id
+        });
     };
 
     const getEmployee = (id: string) => {
@@ -166,10 +241,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             // Mapping special username to email if necessary
             const targetEmail = email === 'glorysmartech' ? 'glorysmart.tech@gmail.com' : email;
 
-            await signInWithEmailAndPassword(auth, targetEmail, password);
+            const userCredential = await signInWithEmailAndPassword(auth, targetEmail, password);
+
+            // Check suspension status immediately
+            const adminDoc = await import('firebase/firestore').then(mod => mod.getDoc(doc(db, 'admins', userCredential.user.uid)));
+            if (adminDoc.exists() && adminDoc.data().suspended) {
+                await signOut(auth);
+                throw new Error("ACCOUNT_SUSPENDED");
+            }
+
             return true;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Login error:', error);
+            if (error.message === "ACCOUNT_SUSPENDED") {
+                alert("Votre compte a été suspendu. Veuillez contacter le support.");
+            }
             return false;
         }
     };
@@ -209,9 +295,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         () => localStorage.getItem('User_Access_Level') === 'ADMIN_MASTER'
     );
 
-    const enableKioskAdmin = () => {
+    const enableKioskAdmin = (adminId?: string) => {
         localStorage.setItem('User_Access_Level', 'ADMIN_MASTER');
         localStorage.setItem('isAuthenticated', 'true');
+        if (adminId) {
+            localStorage.setItem('kiosk_admin_id', adminId);
+            setKioskAdminId(adminId);
+        }
         setIsKioskAdmin(true);
     };
 
@@ -219,6 +309,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         localStorage.removeItem('User_Access_Level');
         localStorage.removeItem('isAuthenticated');
         localStorage.removeItem('kiosk_admin_session');
+        localStorage.removeItem('kiosk_admin_id');
+        setKioskAdminId(null);
         setIsKioskAdmin(false);
     };
 
@@ -280,6 +372,11 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
     }, [adminUser?.email]);
 
+    const updateGlobalSchedule = async (schedule: Schedule) => {
+        if (!adminUser?.id) return;
+        await setDoc(doc(db, 'settings', `schedule_${adminUser.id}`), schedule);
+    };
+
     return (
         <StoreContext.Provider value={{
             employees,
@@ -310,7 +407,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             toggleAdminSuspend,
             impersonateAdmin,
             exitImpersonation,
-            superAdminSession
+            superAdminSession,
+            globalSchedule,
+            updateGlobalSchedule,
+            setDetectedAdminId
         }}>
             {children}
         </StoreContext.Provider>

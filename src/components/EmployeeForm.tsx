@@ -13,7 +13,7 @@ interface EmployeeFormProps {
 }
 
 const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }) => {
-    const { employees, addEmployee, updateEmployee, modelsLoaded, loadingError } = useStore();
+    const { employees, zones, addEmployee, updateEmployee, modelsLoaded, loadingError } = useStore();
     const navigate = useNavigate();
     const webcamRef = useRef<Webcam>(null);
 
@@ -22,6 +22,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
     const [matricule, setMatricule] = useState(employeeToEdit?.matricule || '');
     const [phone, setPhone] = useState(employeeToEdit?.phone || '');
     const [isKiosk, setIsKiosk] = useState(employeeToEdit?.isKiosk || false);
+    const [assignedZoneId, setAssignedZoneId] = useState(employeeToEdit?.assignedZoneId || '');
     const [isCapturing, setIsCapturing] = useState(false);
     const [capturedImage, setCapturedImage] = useState<string | null>(employeeToEdit?.photo || null);
     const [processing, setProcessing] = useState(false);
@@ -131,6 +132,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
                 phone: phone || "",
                 role: employeeToEdit?.role || 'employee' as const,
                 isKiosk,
+                assignedZoneId: assignedZoneId || undefined
             };
 
             if (employeeToEdit) {
@@ -225,6 +227,20 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
                         <label htmlFor="isKiosk" className="text-sm font-medium text-gray-700">
                             Borne de pointage
                         </label>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Zone assignée</label>
+                        <select
+                            value={assignedZoneId}
+                            onChange={(e) => setAssignedZoneId(e.target.value)}
+                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
+                        >
+                            <option value="">Toutes les zones (Défaut)</option>
+                            {zones.map(zone => (
+                                <option key={zone.id} value={zone.id}>{zone.name}</option>
+                            ))}
+                        </select>
                     </div>
                 </div>
 

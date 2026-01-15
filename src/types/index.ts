@@ -1,3 +1,27 @@
+export type ScheduleModality = 'fixed' | 'flexible' | 'weekly';
+
+export interface DaySchedule {
+    isActive: boolean;
+    start: string;    // HH:mm format (Fixé)
+    end: string;      // HH:mm format (Fixé)
+    duration?: number; // Total minutes or hours per day (Flexible)
+}
+
+export interface Schedule {
+    name?: string;
+    modality: ScheduleModality;
+    workingDays: {
+        monday: DaySchedule;
+        tuesday: DaySchedule;
+        wednesday: DaySchedule;
+        thursday: DaySchedule;
+        friday: DaySchedule;
+        saturday: DaySchedule;
+        sunday: DaySchedule;
+    };
+    totalWeeklyHours?: number; // (Hebdomadaire)
+}
+
 export interface Employee {
     id: string;
     firstName: string;
@@ -8,6 +32,10 @@ export interface Employee {
     phone?: string;
     role: 'admin' | 'employee';
     isKiosk: boolean;
+    hasCustomSchedule?: boolean;
+    schedule?: Schedule;
+    adminId?: string;
+    assignedZoneId?: string;
 }
 
 export interface Zone {
@@ -16,6 +44,7 @@ export interface Zone {
     lat: number;
     lng: number;
     radius: number; // in meters
+    adminId?: string;
 }
 
 export interface AttendanceLog {
@@ -30,6 +59,7 @@ export interface AttendanceLog {
     verified: boolean;
     method: 'face_geo' | 'manual_admin';
     zoneName?: string;
+    adminId?: string;
 }
 
 export interface AdminUser {

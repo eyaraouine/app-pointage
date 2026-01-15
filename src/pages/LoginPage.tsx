@@ -1,18 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { LogIn, AlertCircle } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
-    const { loginAdmin, hasAdmin } = useStore();
     const navigate = useNavigate();
     const location = useLocation();
+    const from = (location.state as any)?.from?.pathname || "/admin/employees";
+
+    const { adminUser, isKioskAdmin, loginAdmin, hasAdmin } = useStore();
+    const storedAuth = localStorage.getItem('User_Access_Level') === 'ADMIN_MASTER';
+
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
 
-    const from = (location.state as any)?.from?.pathname || "/admin/employees";
+    useEffect(() => {
+        if (adminUser || isKioskAdmin || storedAuth) {
+            navigate(from, { replace: true });
+        }
+    }, [adminUser, isKioskAdmin, storedAuth, navigate, from]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

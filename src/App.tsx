@@ -7,6 +7,7 @@ import HomePage from './pages/HomePage';
 import EmployeesPage from './pages/EmployeesPage';
 import ZonesPage from './pages/ZonesPage';
 import LogsPage from './pages/LogsPage';
+import AnalysesPage from './pages/AnalysesPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -38,6 +39,11 @@ function App() {
             <Route path="admin/logs" element={
               <ProtectedRoute>
                 <LogsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="admin/analyses" element={
+              <ProtectedRoute>
+                <AnalysesPage />
               </ProtectedRoute>
             } />
 

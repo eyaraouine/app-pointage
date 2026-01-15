@@ -18,12 +18,28 @@ const InstanceManagement: React.FC = () => {
     const loadAdmins = async () => {
         setLoading(true);
         const data = await getAllAdmins();
-        // Filter out the super admin accounts themselves usually, or keep them visible but disabled
-        setAdmins(data.filter(a => a.role !== 'SUPER_ADMIN'));
+        const MASTER_ADMIN_SEARCH = "hatem raouine";
+
+        // Filter out super admins and sort Master Admin to the top
+        const sortedAdmins = data
+            .filter(a => a.role !== 'SUPER_ADMIN')
+            .sort((a, b) => {
+                const nameA = (a.name || "").toLowerCase();
+                const nameB = (b.name || "").toLowerCase();
+                const isAMaster = nameA.includes(MASTER_ADMIN_SEARCH);
+                const isBMaster = nameB.includes(MASTER_ADMIN_SEARCH);
+                if (isAMaster && !isBMaster) return -1;
+                if (!isAMaster && isBMaster) return 1;
+                return 0;
+            });
+
+        setAdmins(sortedAdmins);
         setLoading(false);
     };
 
     const handleSuspend = async (admin: AdminUser) => {
+        const isMaster = (admin.name || "").toLowerCase().includes("hatem raouine");
+        if (isMaster) return; // Safety check
         if (!confirm(admin.suspended ? "Réactiver ce compte ?" : "Suspendre ce compte ?")) return;
 
         await toggleAdminSuspend(admin.id, !admin.suspended);
@@ -120,16 +136,18 @@ const InstanceManagement: React.FC = () => {
                                                 >
                                                     <LogIn size={20} />
                                                 </button>
-                                                <button
-                                                    onClick={() => handleSuspend(admin)}
-                                                    className={`p-2 rounded-lg transition-colors ${admin.suspended
-                                                        ? 'text-green-600 hover:bg-green-50'
-                                                        : 'text-amber-600 hover:bg-amber-50'
-                                                        }`}
-                                                    title={admin.suspended ? "Réactiver" : "Suspendre"}
-                                                >
-                                                    {admin.suspended ? <ShieldCheck size={20} /> : <ShieldOff size={20} />}
-                                                </button>
+                                                {!(admin.name || "").toLowerCase().includes("hatem raouine") && (
+                                                    <button
+                                                        onClick={() => handleSuspend(admin)}
+                                                        className={`p-2 rounded-lg transition-colors ${admin.suspended
+                                                            ? 'text-green-600 hover:bg-green-50'
+                                                            : 'text-amber-600 hover:bg-amber-50'
+                                                            }`}
+                                                        title={admin.suspended ? "Réactiver" : "Suspendre"}
+                                                    >
+                                                        {admin.suspended ? <ShieldCheck size={20} /> : <ShieldOff size={20} />}
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
