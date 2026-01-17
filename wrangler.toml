@@ -1,0 +1,14 @@
+name = "hodour-worker"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+# Variables par défaut (Production)
+[vars]
+ENVIRONMENT = "production"
+API_URL = "https://api.hodour.tech"
+FIREBASE_PROJECT_ID = "app-pointage-ed826"
+
+# Configuration spécifique pour le STAGING
+[env.staging]
+name = "hodour-worker-staging"
+vars = { ENVIRONMENT = "staging", API_URL = "https://staging.api.hodour.tech", FIREBASE_PROJECT_ID = "hodour-staging" }

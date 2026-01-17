@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useCallback } from 'react';
 import Webcam from 'react-webcam';
 import * as faceapi from 'face-api.js';
 import { useStore } from '../context/StoreContext';
@@ -13,18 +13,28 @@ interface EmployeeFormProps {
 }
 
 const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }) => {
-    const { employees, zones, addEmployee, updateEmployee, modelsLoaded, loadingError } = useStore();
+    const { employees, addEmployee, updateEmployee, uploadEmployeePhoto, modelsLoaded, loadingError } = useStore();
     const navigate = useNavigate();
     const webcamRef = useRef<Webcam>(null);
+
+    // MEMOIZATION: Pre-calculate labeled descriptors to avoid UI freeze during duplicate check
+    const labeledDescriptors = useMemo(() => {
+        if (!employees.length) return [];
+        return employees.map(emp => {
+            return new faceapi.LabeledFaceDescriptors(
+                emp.id,
+                [new Float32Array(emp.photoDescriptor)]
+            );
+        });
+    }, [employees]);
 
     const [firstName, setFirstName] = useState(employeeToEdit?.firstName || '');
     const [lastName, setLastName] = useState(employeeToEdit?.lastName || '');
     const [matricule, setMatricule] = useState(employeeToEdit?.matricule || '');
     const [phone, setPhone] = useState(employeeToEdit?.phone || '');
     const [isKiosk, setIsKiosk] = useState(employeeToEdit?.isKiosk || false);
-    const [assignedZoneId, setAssignedZoneId] = useState(employeeToEdit?.assignedZoneId || '');
     const [isCapturing, setIsCapturing] = useState(false);
-    const [capturedImage, setCapturedImage] = useState<string | null>(employeeToEdit?.photo || null);
+    const [capturedImage, setCapturedImage] = useState<string | null>(employeeToEdit?.photoURL || employeeToEdit?.photo || null);
     const [processing, setProcessing] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showSuccess, setShowSuccess] = useState(false);
@@ -101,15 +111,8 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
             }
 
             // 3. Face Duplicate Check
-            const hasNewPhoto = capturedImage !== employeeToEdit?.photo;
-            if (hasNewPhoto && employees.length > 0) {
-                const labeledDescriptors = employees.map(emp => {
-                    return new faceapi.LabeledFaceDescriptors(
-                        emp.id,
-                        [new Float32Array(emp.photoDescriptor)]
-                    );
-                });
-
+            const hasNewPhoto = capturedImage !== (employeeToEdit?.photoURL || employeeToEdit?.photo);
+            if (hasNewPhoto && labeledDescriptors.length > 0) {
                 const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.5);
                 const match = faceMatcher.findBestMatch(detection.descriptor);
 
@@ -121,18 +124,27 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
                 }
             }
 
-            // 4. Save/Update employee
+            // 4. Upload photo if it's new (is a base64 string)
+            let photoURL = employeeToEdit?.photoURL || "";
+            const isBase64 = capturedImage.startsWith('data:image');
+
+            if (isBase64) {
+                const tempId = employeeToEdit?.id || crypto.randomUUID();
+                photoURL = await uploadEmployeePhoto(tempId, capturedImage);
+            }
+
+            // 5. Save/Update employee
             const employeeData = {
                 id: employeeToEdit?.id || '',
                 firstName,
                 lastName,
                 photoDescriptor: hasNewPhoto ? Array.from(detection.descriptor) : (employeeToEdit?.photoDescriptor || []),
-                photo: capturedImage,
+                photo: isBase64 ? "" : (employeeToEdit?.photo || ""), // Clear base64 if we have a URL
+                photoURL,
                 matricule: matricule || "",
                 phone: phone || "",
                 role: employeeToEdit?.role || 'employee' as const,
                 isKiosk,
-                assignedZoneId: assignedZoneId || undefined
             };
 
             if (employeeToEdit) {
@@ -227,20 +239,6 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
                         <label htmlFor="isKiosk" className="text-sm font-medium text-gray-700">
                             Borne de pointage
                         </label>
-                    </div>
-
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700">Zone assignée</label>
-                        <select
-                            value={assignedZoneId}
-                            onChange={(e) => setAssignedZoneId(e.target.value)}
-                            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2"
-                        >
-                            <option value="">Toutes les zones (Défaut)</option>
-                            {zones.map(zone => (
-                                <option key={zone.id} value={zone.id}>{zone.name}</option>
-                            ))}
-                        </select>
                     </div>
                 </div>
 

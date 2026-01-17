@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useStore } from '../context/StoreContext';
 import { Users, Building2, Server, Settings, Activity } from 'lucide-react';
+import MonitoringSection from '../components/MonitoringSection';
 
 const SuperAdminDashboard: React.FC = () => {
     const { employees, getAllAdmins, modelsLoaded } = useStore();
@@ -55,6 +56,9 @@ const SuperAdminDashboard: React.FC = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Monitoring Section */}
+            <MonitoringSection />
 
             {/* Maintenance Section */}
             <section className="bg-gray-900 text-white rounded-2xl p-8 relative overflow-hidden">

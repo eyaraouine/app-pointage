@@ -2,9 +2,9 @@ export type ScheduleModality = 'fixed' | 'flexible' | 'weekly';
 
 export interface DaySchedule {
     isActive: boolean;
-    start: string;    // HH:mm format (Fixé)
-    end: string;      // HH:mm format (Fixé)
-    duration?: number; // Total minutes or hours per day (Flexible)
+    start: string;
+    end: string;
+    duration?: number;
 }
 
 export interface Schedule {
@@ -19,15 +19,16 @@ export interface Schedule {
         saturday: DaySchedule;
         sunday: DaySchedule;
     };
-    totalWeeklyHours?: number; // (Hebdomadaire)
+    totalWeeklyHours?: number;
 }
 
 export interface Employee {
     id: string;
     firstName: string;
     lastName: string;
-    photoDescriptor: number[]; // Float32Array converted to array for storage
-    photo?: string; // Base64 captured image
+    photoDescriptor: number[];
+    photo?: string;
+    photoURL?: string;
     matricule?: string;
     phone?: string;
     role: 'admin' | 'employee';
@@ -35,7 +36,6 @@ export interface Employee {
     hasCustomSchedule?: boolean;
     schedule?: Schedule;
     adminId?: string;
-    assignedZoneId?: string;
 }
 
 export interface Zone {
@@ -43,8 +43,8 @@ export interface Zone {
     name: string;
     lat: number;
     lng: number;
-    radius: number; // in meters
-    adminId?: string;
+    radius: number;
+    adminId: string;
 }
 
 export interface AttendanceLog {
@@ -57,9 +57,9 @@ export interface AttendanceLog {
         lng: number;
     };
     verified: boolean;
+    adminId?: string;
     method: 'face_geo' | 'manual_admin';
     zoneName?: string;
-    adminId?: string;
 }
 
 export interface AdminUser {
@@ -67,7 +67,7 @@ export interface AdminUser {
     email: string;
     phone: string;
     username: string;
-    password?: string; // Only used during login/register, not stored in state
+    password?: string;
     name: string;
     role?: 'ADMIN' | 'SUPER_ADMIN';
     suspended?: boolean;

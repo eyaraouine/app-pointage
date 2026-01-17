@@ -256,6 +256,7 @@ const ZoneForm: React.FC<ZoneFormProps> = ({ onSuccess }) => {
             lat: position.lat,
             lng: position.lng,
             radius,
+            adminId: '', // Set by addZone
         });
 
         setShowSuccess(true);

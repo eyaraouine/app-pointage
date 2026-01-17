@@ -17,9 +17,11 @@ import {
     setDoc,
     query,
     where,
-    getDocs
+    getDocs,
+    getDoc
 } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { auth, db, storage } from '../firebase';
 import type { Employee, Zone, AttendanceLog, AdminUser, Schedule } from '../types';
 
 interface StoreContextType {
@@ -56,6 +58,7 @@ interface StoreContextType {
     globalSchedule: Schedule | null;
     updateGlobalSchedule: (schedule: Schedule) => Promise<void>;
     setDetectedAdminId: (adminId: string | null) => void;
+    uploadEmployeePhoto: (employeeId: string, base64: string) => Promise<string>;
 }
 
 const DEFAULT_SCHEDULE: Schedule = {
@@ -109,19 +112,49 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         loadModels();
     }, []);
 
-    // 1. Global Zones Listener (Public - for attendance)
+    // 1. Unified Zones Listener
     useEffect(() => {
-        const unsubZones = onSnapshot(collection(db, 'zones'), (snapshot) => {
-            const allZones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Zone));
-            console.log("📍 Public Zones Loaded:", allZones.length);
-            setZones(allZones);
+        setZones([]); // Clear current zones before fetching new ones for isolation
+        const zonesCollection = collection(db, 'zones');
+
+        // Mode Management: On filtre strictement par adminId
+        // Mode Public: On charge tout pour la détection GPS locale
+
+        const isSuperAdmin = adminUser?.role === 'SUPER_ADMIN';
+        const effectiveId = adminUser?.id || kioskAdminId;
+
+        // Si c'est un Super Admin, on ne filtre pas (il voit tout)
+        // Sinon, si on a un ID d'admin, on filtre par cet ID
+        // Sinon (Mode Public), on charge tout
+        let q;
+        if (isSuperAdmin) {
+            q = zonesCollection;
+        } else if (effectiveId) {
+            q = query(zonesCollection, where('adminId', '==', effectiveId));
+        } else {
+            q = zonesCollection; // Public detection mode
+        }
+
+        const unsubZones = onSnapshot(q, (snapshot) => {
+            const fetchedZones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Zone));
+            console.log(
+                isSuperAdmin ? "🏁 Super Admin: All Zones Loaded" :
+                    effectiveId ? `🔒 Admin/Kiosk Zones Loaded (${effectiveId})` :
+                        "🌍 Public Zones Loaded",
+                fetchedZones.length
+            );
+            setZones(fetchedZones);
+        }, (err) => {
+            console.error("Error fetching zones:", err);
+            setZones([]); // Clear on error for safety
         });
+
         return () => unsubZones();
-    }, []);
+    }, [adminUser?.id, adminUser?.role, kioskAdminId]);
 
     // 2. Conditional Listeners for Employees and Logs
     useEffect(() => {
-        // Preference: Logged in Admin > Kiosk Admin > Detected Zone Admin (Public)
+        // Priority: Logged in Admin > Kiosk Admin > Detected Zone Admin (Public Attendance)
         const effectiveAdminId = adminUser?.id || kioskAdminId || detectedAdminId;
 
         if (!effectiveAdminId) {
@@ -155,7 +188,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             unsubLogs();
             unsubSettings();
         };
-    }, [adminUser?.id, kioskAdminId]);
+    }, [adminUser?.id, kioskAdminId, detectedAdminId]);
 
     // Independent Auth Listener
     useEffect(() => {
@@ -191,44 +224,73 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const addEmployee = async (employee: Employee) => {
         const { id, ...data } = employee;
-        await addDoc(collection(db, 'employees'), {
-            ...data,
-            adminId: adminUser?.id
-        });
+        // Ensure we don't save the massive base64 in Firestore anymore if photoURL exists
+        const finalData = { ...data, adminId: adminUser?.id };
+        if (data.photoURL) delete (finalData as any).photo;
+
+        await addDoc(collection(db, 'employees'), finalData);
     };
 
     const updateEmployee = async (employee: Employee) => {
         const { id, ...data } = employee;
         if (!id) return;
-        await updateDoc(doc(db, 'employees', id), data as any);
+        const finalData = { ...data };
+        if (data.photoURL) delete (finalData as any).photo;
+
+        await updateDoc(doc(db, 'employees', id), finalData as any);
+    };
+
+    const uploadEmployeePhoto = async (employeeId: string, base64: string) => {
+        // Remove data:image/jpeg;base64, prefix if present
+        const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
+        const storageRef = ref(storage, `employees/${employeeId}.jpg`);
+        await uploadString(storageRef, base64Data, 'base64', { contentType: 'image/jpeg' });
+        const url = await getDownloadURL(storageRef);
+        return url;
     };
 
     const deleteEmployee = async (id: string) => {
         await deleteDoc(doc(db, 'employees', id));
     };
 
-    const addZone = async (zone: Zone) => {
-        const { id, ...data } = zone;
+    const addZone = async (zone: Omit<Zone, 'id'>) => {
+        if (!adminUser?.id) throw new Error("Authentication required to add zone");
         await addDoc(collection(db, 'zones'), {
-            ...data,
-            adminId: adminUser?.id
+            ...zone,
+            adminId: adminUser.id
         });
     };
 
     const deleteZone = async (id: string) => {
-        await deleteDoc(doc(db, 'zones', id));
+        if (!adminUser?.id) return;
+        // Verify ownership before deleting
+        const zoneDoc = await getDoc(doc(db, 'zones', id));
+        if (zoneDoc.exists() && zoneDoc.data().adminId === adminUser.id) {
+            await deleteDoc(doc(db, 'zones', id));
+        } else {
+            console.error("Unauthorized delete attempt or zone not found");
+        }
     };
 
     const updateZone = async (updatedZone: Zone) => {
+        if (!adminUser?.id) return;
         const { id, ...data } = updatedZone;
-        await updateDoc(doc(db, 'zones', id), data as any);
+        if (!id) return;
+
+        // Verify ownership before updating
+        const zoneDoc = await getDoc(doc(db, 'zones', id));
+        if (zoneDoc.exists() && zoneDoc.data().adminId === adminUser.id) {
+            await updateDoc(doc(db, 'zones', id), { ...data, adminId: adminUser.id } as any);
+        } else {
+            console.error("Unauthorized update attempt or zone not found");
+        }
     };
 
     const addLog = async (log: AttendanceLog) => {
         const { id, ...data } = log;
         await addDoc(collection(db, 'logs'), {
             ...data,
-            adminId: adminUser?.id
+            adminId: log.adminId || adminUser?.id
         });
     };
 
@@ -410,7 +472,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             superAdminSession,
             globalSchedule,
             updateGlobalSchedule,
-            setDetectedAdminId
+            setDetectedAdminId,
+            uploadEmployeePhoto
         }}>
             {children}
         </StoreContext.Provider>
