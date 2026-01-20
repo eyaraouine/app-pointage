@@ -1,5 +1,5 @@
 name = "hodour-worker"
-main = "src/worker.ts"
+main = "worker/index.ts"
 compatibility_date = "2024-01-01"
 
 # Variables par défaut (Production)
