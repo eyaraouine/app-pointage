@@ -3,7 +3,7 @@ name: Deployment CI/CD (Hodour)
 on:
   push:
     branches:
-      - main
+      - master
       - develop
 
 jobs:
@@ -37,7 +37,7 @@ jobs:
 
       # --- DEPLOY TO PRODUCTION ---
       - name: Deploy to Firebase Production
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/master'
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
@@ -50,4 +50,4 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+          environment: ${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
