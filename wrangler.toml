@@ -13,3 +13,8 @@ FIREBASE_PROJECT_ID = "app-pointage-ed826"
 [env.staging]
 name = "hodour-worker-staging"
 vars = { ENVIRONMENT = "staging", API_URL = "https://staging.api.hodour.tech", FIREBASE_PROJECT_ID = "hodour-staging" }
+
+# Configuration spécifique pour la PRODUCTION
+[env.production]
+name = "hodour-worker"
+vars = { ENVIRONMENT = "production", API_URL = "https://api.hodour.tech", FIREBASE_PROJECT_ID = "app-pointage-ed826" }
