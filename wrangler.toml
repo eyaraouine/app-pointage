@@ -1,6 +1,7 @@
 name = "hodour-worker"
 main = "worker/index.ts"
 compatibility_date = "2024-01-01"
+workers_dev = true
 
 # Variables par défaut (Production)
 [vars]
