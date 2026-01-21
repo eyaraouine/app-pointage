@@ -22,8 +22,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Application
-        run: npm run build
+      - name: Build Staging
+        if: github.ref == 'refs/heads/develop'
+        run: npm run build -- --mode staging
+
+      - name: Build Production
+        if: github.ref == 'refs/heads/master'
+        run: npm run build -- --mode production
 
       # --- DEPLOY TO STAGING ---
       - name: Deploy to Firebase Staging
