@@ -56,6 +56,7 @@ interface StoreContextType {
     superAdminSession: AdminUser | null;
     // Planning
     globalSchedule: Schedule | null;
+    isScheduleSet: boolean;
     updateGlobalSchedule: (schedule: Schedule) => Promise<void>;
     setDetectedAdminId: (adminId: string | null) => void;
     uploadEmployeePhoto: (employeeId: string, base64: string) => Promise<string>;
@@ -85,6 +86,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [modelsLoaded, setModelsLoaded] = useState(false);
     const [loadingError, setLoadingError] = useState<string | null>(null);
     const [globalSchedule, setGlobalSchedule] = useState<Schedule | null>(null);
+    const [isScheduleSet, setIsScheduleSet] = useState(false);
     const [kioskAdminId, setKioskAdminId] = useState<string | null>(
         () => localStorage.getItem('kiosk_admin_id')
     );
@@ -178,8 +180,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const unsubSettings = onSnapshot(doc(db, 'settings', `schedule_${effectiveAdminId}`), (snapshot) => {
             if (snapshot.exists()) {
                 setGlobalSchedule(snapshot.data() as Schedule);
+                setIsScheduleSet(true);
             } else {
                 setGlobalSchedule(DEFAULT_SCHEDULE);
+                setIsScheduleSet(false);
             }
         });
 
@@ -471,6 +475,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             exitImpersonation,
             superAdminSession,
             globalSchedule,
+            isScheduleSet,
             updateGlobalSchedule,
             setDetectedAdminId,
             uploadEmployeePhoto
