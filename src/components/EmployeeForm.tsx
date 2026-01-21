@@ -36,6 +36,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
     const [isCapturing, setIsCapturing] = useState(false);
     const [capturedImage, setCapturedImage] = useState<string | null>(employeeToEdit?.photoURL || employeeToEdit?.photo || null);
     const [processing, setProcessing] = useState(false);
+    const [processingStep, setProcessingStep] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
     const [showSuccess, setShowSuccess] = useState(false);
 
@@ -92,6 +93,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
             }
 
             // 2. Face Detection
+            setProcessingStep("Analyse du visage...");
             const img = new Image();
             img.src = capturedImage;
             await new Promise((resolve, reject) => {
@@ -111,6 +113,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
             }
 
             // 3. Face Duplicate Check
+            setProcessingStep("Vérification des doublons...");
             const hasNewPhoto = capturedImage !== (employeeToEdit?.photoURL || employeeToEdit?.photo);
             if (hasNewPhoto && labeledDescriptors.length > 0) {
                 const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.5);
@@ -129,11 +132,18 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
             const isBase64 = capturedImage.startsWith('data:image');
 
             if (isBase64) {
+                setProcessingStep("Envoi de la photo vers le serveur...");
                 const tempId = employeeToEdit?.id || crypto.randomUUID();
-                photoURL = await uploadEmployeePhoto(tempId, capturedImage);
+                try {
+                    photoURL = await uploadEmployeePhoto(tempId, capturedImage);
+                } catch (storageErr: any) {
+                    console.error("Storage error:", storageErr);
+                    throw new Error(`Erreur Storage: ${storageErr.message || "Vérifiez que Firebase Storage est activé et en mode test"}`);
+                }
             }
 
             // 5. Save/Update employee
+            setProcessingStep("Enregistrement en base de données...");
             const employeeData = {
                 id: employeeToEdit?.id || '',
                 firstName,
@@ -147,10 +157,15 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
                 isKiosk,
             };
 
-            if (employeeToEdit) {
-                await updateEmployee(employeeData);
-            } else {
-                await addEmployee(employeeData);
+            try {
+                if (employeeToEdit) {
+                    await updateEmployee(employeeData);
+                } else {
+                    await addEmployee(employeeData);
+                }
+            } catch (firestoreErr: any) {
+                console.error("Firestore error:", firestoreErr);
+                throw new Error(`Erreur Database: ${firestoreErr.message || "Vérifiez que Firestore est activé et en mode test"}`);
             }
             setShowSuccess(true);
 
@@ -310,7 +325,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
                     ) : processing ? (
                         <>
                             <Loader2 size={20} className="animate-spin" />
-                            Traitement...
+                            {processingStep || "Traitement..."}
                         </>
                     ) : (
                         <>
