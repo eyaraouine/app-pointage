@@ -230,7 +230,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const { id, ...data } = employee;
         // Ensure we don't save the massive base64 in Firestore anymore if photoURL exists
         const finalData = { ...data, adminId: adminUser?.id };
-        if (data.photoURL) delete (finalData as any).photo;
+        if (data.photoURL && (finalData as any).photo) {
+            delete (finalData as any).photo;
+        }
 
         await addDoc(collection(db, 'employees'), finalData);
     };
@@ -239,7 +241,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const { id, ...data } = employee;
         if (!id) return;
         const finalData = { ...data };
-        if (data.photoURL) delete (finalData as any).photo;
+        if (data.photoURL && (finalData as any).photo) {
+            delete (finalData as any).photo;
+        }
 
         await updateDoc(doc(db, 'employees', id), finalData as any);
     };

@@ -12,6 +12,27 @@ interface EmployeeFormProps {
     onSuccess?: () => void;
 }
 
+const compressImage = (base64: string, maxWidth = 400): Promise<string> => {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.src = base64;
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            if (width > maxWidth) {
+                height = (maxWidth / width) * height;
+                width = maxWidth;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            resolve(canvas.toDataURL('image/jpeg', 0.6));
+        };
+    });
+};
+
 const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }) => {
     const { employees, addEmployee, updateEmployee, uploadEmployeePhoto, modelsLoaded, loadingError } = useStore();
     const navigate = useNavigate();
@@ -129,16 +150,22 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
 
             // 4. Upload photo if it's new (is a base64 string)
             let photoURL = employeeToEdit?.photoURL || "";
+            let localPhotoBackup = "";
             const isBase64 = capturedImage.startsWith('data:image');
 
             if (isBase64) {
-                setProcessingStep("Envoi de la photo vers le serveur...");
+                setProcessingStep("Optimisation de l'image...");
+                const compressed = await compressImage(capturedImage);
+                localPhotoBackup = compressed;
+
+                setProcessingStep("Envoi vers le serveur (Tentative)...");
                 const tempId = employeeToEdit?.id || crypto.randomUUID();
                 try {
-                    photoURL = await uploadEmployeePhoto(tempId, capturedImage);
+                    photoURL = await uploadEmployeePhoto(tempId, compressed);
                 } catch (storageErr: any) {
-                    console.error("Storage error:", storageErr);
-                    throw new Error(`Erreur Storage: ${storageErr.message || "Vérifiez que Firebase Storage est activé et en mode test"}`);
+                    console.warn("Storage non disponible, utilisation du stockage local (DB):", storageErr);
+                    // On continue sans photoURL, la photo sera stockée en base64 dans Firestore
+                    photoURL = "";
                 }
             }
 
@@ -149,7 +176,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
                 firstName,
                 lastName,
                 photoDescriptor: hasNewPhoto ? Array.from(detection.descriptor) : (employeeToEdit?.photoDescriptor || []),
-                photo: isBase64 ? "" : (employeeToEdit?.photo || ""), // Clear base64 if we have a URL
+                photo: photoURL ? "" : (localPhotoBackup || employeeToEdit?.photo || ""),
                 photoURL,
                 matricule: matricule || "",
                 phone: phone || "",
