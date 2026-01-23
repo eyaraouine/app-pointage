@@ -31,7 +31,7 @@ interface StoreContextType {
     addEmployee: (employee: Employee) => Promise<void>;
     updateEmployee: (employee: Employee) => Promise<void>;
     deleteEmployee: (id: string) => Promise<void>;
-    addZone: (zone: Zone) => Promise<void>;
+    addZone: (zone: Omit<Zone, 'id'>) => Promise<void>;
     deleteZone: (id: string) => Promise<void>;
     updateZone: (zone: Zone) => Promise<void>;
     addLog: (log: AttendanceLog) => Promise<void>;
@@ -138,7 +138,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
 
         const unsubZones = onSnapshot(q, (snapshot) => {
-            const fetchedZones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Zone));
+            const fetchedZones = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Zone));
             console.log(
                 isSuperAdmin ? "🏁 Super Admin: All Zones Loaded" :
                     effectiveId ? `🔒 Admin/Kiosk Zones Loaded (${effectiveId})` :

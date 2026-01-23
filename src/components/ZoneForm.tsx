@@ -251,7 +251,6 @@ const ZoneForm: React.FC<ZoneFormProps> = ({ onSuccess }) => {
         }
 
         await addZone({
-            id: '', // Will be set by Firestore
             name,
             lat: position.lat,
             lng: position.lng,
