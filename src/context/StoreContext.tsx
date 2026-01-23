@@ -279,12 +279,21 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const deleteZone = async (id: string) => {
         if (!adminUser?.id) return;
-        // Verify ownership before deleting
-        const zoneDoc = await getDoc(doc(db, 'zones', id));
-        if (zoneDoc.exists() && zoneDoc.data().adminId === adminUser.id) {
-            await deleteDoc(doc(db, 'zones', id));
-        } else {
-            console.error("Unauthorized delete attempt or zone not found");
+        try {
+            const zoneDoc = await getDoc(doc(db, 'zones', id));
+            if (zoneDoc.exists()) {
+                const zoneData = zoneDoc.data();
+                const isOwner = zoneData.adminId === adminUser.id;
+                const isSuperAdmin = adminUser.role === 'SUPER_ADMIN';
+
+                if (isOwner || isSuperAdmin) {
+                    await deleteDoc(doc(db, 'zones', id));
+                } else {
+                    console.error("Unauthorized: Only owners or super admins can delete zones");
+                }
+            }
+        } catch (error) {
+            console.error("Error deleting zone:", error);
         }
     };
 
@@ -293,12 +302,23 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const { id, ...data } = updatedZone;
         if (!id) return;
 
-        // Verify ownership before updating
-        const zoneDoc = await getDoc(doc(db, 'zones', id));
-        if (zoneDoc.exists() && zoneDoc.data().adminId === adminUser.id) {
-            await updateDoc(doc(db, 'zones', id), { ...data, adminId: adminUser.id } as any);
-        } else {
-            console.error("Unauthorized update attempt or zone not found");
+        try {
+            const zoneDoc = await getDoc(doc(db, 'zones', id));
+            if (zoneDoc.exists()) {
+                const zoneData = zoneDoc.data();
+                const isOwner = zoneData.adminId === adminUser.id;
+                const isSuperAdmin = adminUser.role === 'SUPER_ADMIN';
+
+                if (isOwner || isSuperAdmin) {
+                    // Si c'est un super admin, on garde l'adminId d'origine ou on le met à jour
+                    const targetAdminId = isSuperAdmin ? (zoneData.adminId || adminUser.id) : adminUser.id;
+                    await updateDoc(doc(db, 'zones', id), { ...data, adminId: targetAdminId } as any);
+                } else {
+                    console.error("Unauthorized: Only owners or super admins can update zones");
+                }
+            }
+        } catch (error) {
+            console.error("Error updating zone:", error);
         }
     };
 
