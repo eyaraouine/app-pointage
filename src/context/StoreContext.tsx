@@ -252,7 +252,15 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         // Remove data:image/jpeg;base64, prefix if present
         const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
         const storageRef = ref(storage, `employees/${employeeId}.jpg`);
-        await uploadString(storageRef, base64Data, 'base64', { contentType: 'image/jpeg' });
+
+        // Timeout of 5 seconds to prevent hanging if storage is blocked
+        const uploadPromise = uploadString(storageRef, base64Data, 'base64', { contentType: 'image/jpeg' });
+        const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error("Timeout: Le stockage distant est trop lent ou bloqué")), 5000)
+        );
+
+        await Promise.race([uploadPromise, timeoutPromise]);
+
         const url = await getDownloadURL(storageRef);
         return url;
     };
