@@ -278,16 +278,32 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const deleteZone = async (id: string) => {
-        if (!adminUser?.id) return;
+        console.log("deleteZone function entered for ID:", id);
+        if (!adminUser?.id) {
+            console.error("deleteZone: No adminUser.id found");
+            return;
+        }
+
         try {
             const zoneDoc = await getDoc(doc(db, 'zones', id));
+            console.log("deleteZone: Document fetched, exists?", zoneDoc.exists());
+
             if (zoneDoc.exists()) {
                 const zoneData = zoneDoc.data();
                 const isOwner = zoneData.adminId === adminUser.id;
-                const isSuperAdmin = adminUser.role === 'SUPER_ADMIN';
+                const isSuperAdmin = adminUser.role === 'SUPER_ADMIN' || superAdminSession?.role === 'SUPER_ADMIN';
+
+                console.log("deleteZone Check:", {
+                    isOwner,
+                    isSuperAdmin,
+                    zoneAdminId: zoneData.adminId,
+                    currentAdminId: adminUser.id,
+                    superAdminSessionActive: !!superAdminSession
+                });
 
                 if (isOwner || isSuperAdmin) {
                     await deleteDoc(doc(db, 'zones', id));
+                    console.log("deleteZone: Document deleted successfully");
                 } else {
                     console.error("Unauthorized: Only owners or super admins can delete zones");
                 }

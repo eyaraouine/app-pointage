@@ -34,8 +34,12 @@ const ZoneList: React.FC = () => {
 
                     <button
                         onClick={() => {
+                            console.log("Delete button clicked for zone:", zone.name, zone.id);
                             if (window.confirm(`Supprimer la zone "${zone.name}" ?`)) {
+                                console.log("Confirmation accepted for zone:", zone.id);
                                 deleteZone(zone.id);
+                            } else {
+                                console.log("Confirmation rejected for zone:", zone.id);
                             }
                         }}
                         className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
