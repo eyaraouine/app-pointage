@@ -105,7 +105,7 @@ const ScheduleManager: React.FC<ScheduleManagerProps> = (props) => {
 
                     <div className="space-y-2">
                         <p className="text-gray-500 text-sm leading-relaxed">
-                            Planifiez votre travail en fixant les horaires de travail, les heures de pause et les règles relatives aux heures supplémentaires de votre entreprise.
+                            Planifiez votre travail en fixant les horaires de travail de votre entreprise
                         </p>
                     </div>
 
@@ -118,8 +118,8 @@ const ScheduleManager: React.FC<ScheduleManagerProps> = (props) => {
                                     key={m}
                                     onClick={() => setModality(m)}
                                     className={`flex-1 py-4 rounded-xl text-sm font-bold transition-all ${modality === m
-                                            ? 'bg-white text-orange-600 shadow-md border border-orange-100'
-                                            : 'text-gray-400 hover:text-gray-600'
+                                        ? 'bg-white text-orange-600 shadow-md border border-orange-100'
+                                        : 'text-gray-400 hover:text-gray-600'
                                         }`}
                                 >
                                     {m === 'fixed' ? 'Fixé' : m === 'flexible' ? 'Flexible' : 'Hebdomadaire'}
@@ -137,8 +137,8 @@ const ScheduleManager: React.FC<ScheduleManagerProps> = (props) => {
                                     key={day.key}
                                     onClick={() => toggleDay(day.key as any)}
                                     className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-lg border-2 transition-all ${workingDays[day.key as keyof Schedule['workingDays']].isActive
-                                            ? 'bg-orange-50 border-orange-400 text-orange-600'
-                                            : 'bg-white border-gray-100 text-gray-400 font-medium'
+                                        ? 'bg-orange-50 border-orange-400 text-orange-600'
+                                        : 'bg-white border-gray-100 text-gray-400 font-medium'
                                         }`}
                                 >
                                     {day.label}
