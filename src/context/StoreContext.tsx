@@ -428,16 +428,28 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setIsKioskAdmin(false);
     };
 
-    // Security: invalidates session on background
+    // Security: invalidates session on background with a grace period for redirects
     useEffect(() => {
+        let timeoutId: NodeJS.Timeout;
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'hidden' && isKioskAdmin) {
-                console.log("App backgrounded, revoking kiosk session.");
-                disableKioskAdmin();
+                console.log("App backgrounded, scheduling session revocation...");
+                // 2 second grace period to allow for window.location redirects or quick accidental backgrounding
+                timeoutId = setTimeout(() => {
+                    if (document.visibilityState === 'hidden') {
+                        console.log("Session revoked after grace period.");
+                        disableKioskAdmin();
+                    }
+                }, 2000);
+            } else if (document.visibilityState === 'visible') {
+                if (timeoutId) clearTimeout(timeoutId);
             }
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            if (timeoutId) clearTimeout(timeoutId);
+        };
     }, [isKioskAdmin]);
 
 

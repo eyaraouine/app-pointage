@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import * as faceapi from 'face-api.js';
 import { useStore } from '../context/StoreContext';
@@ -11,6 +12,7 @@ import AdminSuccessModal from '../components/AdminSuccessModal';
 import clsx from 'clsx';
 
 const AttendancePage: React.FC = () => {
+    const navigate = useNavigate();
     const { employees, zones, logs, addLog, modelsLoaded, loadingError, enableKioskAdmin, setDetectedAdminId } = useStore();
     const webcamRef = useRef<Webcam>(null);
 
@@ -136,7 +138,7 @@ const AttendancePage: React.FC = () => {
 
     const handleModalClose = () => {
         setShowAdminSuccessModal(false);
-        window.location.href = '/admin/employees';
+        navigate('/admin/employees');
     };
 
     const handlePointage = async () => {
