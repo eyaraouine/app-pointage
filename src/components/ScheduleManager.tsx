@@ -172,20 +172,29 @@ const ScheduleManager: React.FC<ScheduleManagerProps> = (props) => {
                                         <span className="font-bold text-gray-700 min-w-[100px]">{dayNamesFR[day.key]}</span>
 
                                         {modality === 'fixed' ? (
-                                            <div className="flex items-center gap-3">
-                                                <input
-                                                    type="time"
-                                                    value={dayData.start}
-                                                    onChange={(e) => updateTimeValue(day.key as any, 'start', e.target.value)}
-                                                    className="bg-white border border-gray-200 rounded-2xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-orange-500 outline-none w-32 shadow-sm"
-                                                />
-                                                <span className="text-gray-400 font-bold">à</span>
-                                                <input
-                                                    type="time"
-                                                    value={dayData.end}
-                                                    onChange={(e) => updateTimeValue(day.key as any, 'end', e.target.value)}
-                                                    className="bg-white border border-gray-200 rounded-2xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-orange-500 outline-none w-32 shadow-sm"
-                                                />
+                                            <div className="flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-300">
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Heure d'arrivée</label>
+                                                    <div className="bg-gray-50 rounded-2xl p-1 shadow-inner border border-gray-100">
+                                                        <input
+                                                            type="time"
+                                                            value={dayData.start}
+                                                            onChange={(e) => updateTimeValue(day.key as any, 'start', e.target.value)}
+                                                            className="w-full bg-transparent border-none px-5 py-4 text-xl font-black text-gray-800 focus:ring-0 outline-none"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Heure de départ</label>
+                                                    <div className="bg-gray-50 rounded-2xl p-1 shadow-inner border border-gray-100">
+                                                        <input
+                                                            type="time"
+                                                            value={dayData.end}
+                                                            onChange={(e) => updateTimeValue(day.key as any, 'end', e.target.value)}
+                                                            className="w-full bg-transparent border-none px-5 py-4 text-xl font-black text-gray-800 focus:ring-0 outline-none"
+                                                        />
+                                                    </div>
+                                                </div>
                                             </div>
                                         ) : (
                                             <div className="flex items-center gap-3">
