@@ -10,10 +10,8 @@ import type { Zone } from '../types';
 import AdminAccessButton from '../components/AdminAccessButton';
 import AdminSuccessModal from '../components/AdminSuccessModal';
 import clsx from 'clsx';
-import { useNavigate } from 'react-router-dom';
 
 const AttendancePage: React.FC = () => {
-    const navigate = useNavigate();
     const { t } = useLanguage();
     const { employees, zones, logs, addLog, modelsLoaded, enableKioskAdmin, setDetectedAdminId } = useStore();
     const webcamRef = useRef<Webcam>(null);
