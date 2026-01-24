@@ -3,7 +3,7 @@ name: Deployment CI/CD (Hodour)
 on:
   push:
     branches:
-      - master
+      - main
       - develop
 
 jobs:
@@ -22,13 +22,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Staging
-        if: github.ref == 'refs/heads/develop'
-        run: npm run build -- --mode staging
-
-      - name: Build Production
-        if: github.ref == 'refs/heads/master'
-        run: npm run build -- --mode production
+      - name: Build Application
+        run: npm run build
 
       # --- DEPLOY TO STAGING ---
       - name: Deploy to Firebase Staging
@@ -42,12 +37,12 @@ jobs:
 
       # --- DEPLOY TO PRODUCTION ---
       - name: Deploy to Firebase Production
-        if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/main'
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_PROD }}'
-          projectId: app-pointage-ed826
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_STAGING }}'
+          projectId: app-pointage-ed826 # Votre ID de PROD réel
           channelId: live
 
       # --- CLOUDFLARE DEPLOYMENT ---
@@ -55,4 +50,4 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          environment: ${{ github.ref == 'refs/heads/master' && 'production' || 'staging' }}
+          environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}

@@ -353,17 +353,8 @@ const LogsPage: React.FC = () => {
                     </div>
                 )}
 
-                {/* Note sur la rétention des données */}
-                <div className="mt-4 flex items-center gap-2 p-3 bg-blue-50/50 rounded-xl border border-blue-100/50 mb-4 font-bold">
-                    <Info size={16} className="text-blue-600 flex-shrink-0" />
-                    <p className="text-[11px] text-blue-900 leading-tight">
-                        Note importante : Les données de pointage sont conservées pendant une durée de 12 mois.
-                        Pensez à exporter vos rapports régulièrement pour vos archives.
-                    </p>
-                </div>
-
                 {/* Export Buttons */}
-                <div className="flex justify-end gap-2">
+                <div className="mt-4 flex justify-end gap-2">
                     <button
                         onClick={() => viewMode === 'daily' ? exportDaily('csv') : exportMonthly('csv')}
                         className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-xl text-sm font-bold shadow-sm hover:bg-gray-50 transition-colors"

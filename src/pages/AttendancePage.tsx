@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
 import Webcam from 'react-webcam';
 import * as faceapi from 'face-api.js';
 import { useStore } from '../context/StoreContext';
@@ -12,8 +11,7 @@ import AdminSuccessModal from '../components/AdminSuccessModal';
 import clsx from 'clsx';
 
 const AttendancePage: React.FC = () => {
-    const navigate = useNavigate();
-    const { employees, zones, logs, addLog, modelsLoaded, loadingError, enableKioskAdmin, setDetectedAdminId } = useStore();
+    const { employees, zones, logs, addLog, modelsLoaded, enableKioskAdmin, setDetectedAdminId } = useStore();
     const webcamRef = useRef<Webcam>(null);
 
     const [location, setLocation] = useState<{ lat: number, lng: number, accuracy: number } | null>(null);
@@ -138,7 +136,7 @@ const AttendancePage: React.FC = () => {
 
     const handleModalClose = () => {
         setShowAdminSuccessModal(false);
-        navigate('/admin/employees');
+        window.location.href = '/admin/employees';
     };
 
     const handlePointage = async () => {
@@ -183,30 +181,7 @@ const AttendancePage: React.FC = () => {
         }
     };
 
-    if (!modelsLoaded) {
-        return (
-            <div className="flex flex-col h-full items-center justify-center p-8 text-center">
-                {loadingError ? (
-                    <div className="bg-red-50 text-red-600 p-6 rounded-3xl border border-red-100 space-y-3 animate-in fade-in duration-500">
-                        <AlertTriangle size={48} className="mx-auto" />
-                        <h3 className="font-bold text-lg">Problème de chargement</h3>
-                        <p className="text-sm">{loadingError}</p>
-                        <button
-                            onClick={() => window.location.reload()}
-                            className="w-full py-3 bg-red-600 text-white rounded-xl font-bold mt-4"
-                        >
-                            Réessayer
-                        </button>
-                    </div>
-                ) : (
-                    <>
-                        <Loader2 className="animate-spin text-blue-600 mb-4" size={48} />
-                        <p className="text-gray-500 font-medium italic">Chargement des modèles d'IA...</p>
-                    </>
-                )}
-            </div>
-        );
-    }
+    if (!modelsLoaded) return <div className="flex h-full items-center justify-center p-8"><Loader2 className="animate-spin text-blue-600" size={48} /></div>;
 
     if (status === 'success') return (
         <div className="flex flex-col items-center justify-center h-[80vh] p-4 text-center animate-in zoom-in duration-300">

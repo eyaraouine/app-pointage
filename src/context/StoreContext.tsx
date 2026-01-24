@@ -31,7 +31,7 @@ interface StoreContextType {
     addEmployee: (employee: Employee) => Promise<void>;
     updateEmployee: (employee: Employee) => Promise<void>;
     deleteEmployee: (id: string) => Promise<void>;
-    addZone: (zone: Omit<Zone, 'id'>) => Promise<void>;
+    addZone: (zone: Zone) => Promise<void>;
     deleteZone: (id: string) => Promise<void>;
     updateZone: (zone: Zone) => Promise<void>;
     addLog: (log: AttendanceLog) => Promise<void>;
@@ -56,7 +56,6 @@ interface StoreContextType {
     superAdminSession: AdminUser | null;
     // Planning
     globalSchedule: Schedule | null;
-    isScheduleSet: boolean;
     updateGlobalSchedule: (schedule: Schedule) => Promise<void>;
     setDetectedAdminId: (adminId: string | null) => void;
     uploadEmployeePhoto: (employeeId: string, base64: string) => Promise<string>;
@@ -86,7 +85,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const [modelsLoaded, setModelsLoaded] = useState(false);
     const [loadingError, setLoadingError] = useState<string | null>(null);
     const [globalSchedule, setGlobalSchedule] = useState<Schedule | null>(null);
-    const [isScheduleSet, setIsScheduleSet] = useState(false);
     const [kioskAdminId, setKioskAdminId] = useState<string | null>(
         () => localStorage.getItem('kiosk_admin_id')
     );
@@ -138,7 +136,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
 
         const unsubZones = onSnapshot(q, (snapshot) => {
-            const fetchedZones = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Zone));
+            const fetchedZones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Zone));
             console.log(
                 isSuperAdmin ? "🏁 Super Admin: All Zones Loaded" :
                     effectiveId ? `🔒 Admin/Kiosk Zones Loaded (${effectiveId})` :
@@ -180,10 +178,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const unsubSettings = onSnapshot(doc(db, 'settings', `schedule_${effectiveAdminId}`), (snapshot) => {
             if (snapshot.exists()) {
                 setGlobalSchedule(snapshot.data() as Schedule);
-                setIsScheduleSet(true);
             } else {
                 setGlobalSchedule(DEFAULT_SCHEDULE);
-                setIsScheduleSet(false);
             }
         });
 
@@ -230,9 +226,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const { id, ...data } = employee;
         // Ensure we don't save the massive base64 in Firestore anymore if photoURL exists
         const finalData = { ...data, adminId: adminUser?.id };
-        if (data.photoURL && (finalData as any).photo) {
-            delete (finalData as any).photo;
-        }
+        if (data.photoURL) delete (finalData as any).photo;
 
         await addDoc(collection(db, 'employees'), finalData);
     };
@@ -241,9 +235,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const { id, ...data } = employee;
         if (!id) return;
         const finalData = { ...data };
-        if (data.photoURL && (finalData as any).photo) {
-            delete (finalData as any).photo;
-        }
+        if (data.photoURL) delete (finalData as any).photo;
 
         await updateDoc(doc(db, 'employees', id), finalData as any);
     };
@@ -252,15 +244,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         // Remove data:image/jpeg;base64, prefix if present
         const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
         const storageRef = ref(storage, `employees/${employeeId}.jpg`);
-
-        // Timeout of 5 seconds to prevent hanging if storage is blocked
-        const uploadPromise = uploadString(storageRef, base64Data, 'base64', { contentType: 'image/jpeg' });
-        const timeoutPromise = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Timeout: Le stockage distant est trop lent ou bloqué")), 5000)
-        );
-
-        await Promise.race([uploadPromise, timeoutPromise]);
-
+        await uploadString(storageRef, base64Data, 'base64', { contentType: 'image/jpeg' });
         const url = await getDownloadURL(storageRef);
         return url;
     };
@@ -278,38 +262,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const deleteZone = async (id: string) => {
-        console.log("deleteZone function entered for ID:", id);
-        if (!adminUser?.id) {
-            console.error("deleteZone: No adminUser.id found");
-            return;
-        }
-
-        try {
-            const zoneDoc = await getDoc(doc(db, 'zones', id));
-            console.log("deleteZone: Document fetched, exists?", zoneDoc.exists());
-
-            if (zoneDoc.exists()) {
-                const zoneData = zoneDoc.data();
-                const isOwner = zoneData.adminId === adminUser.id;
-                const isSuperAdmin = adminUser.role === 'SUPER_ADMIN' || superAdminSession?.role === 'SUPER_ADMIN';
-
-                console.log("deleteZone Check:", {
-                    isOwner,
-                    isSuperAdmin,
-                    zoneAdminId: zoneData.adminId,
-                    currentAdminId: adminUser.id,
-                    superAdminSessionActive: !!superAdminSession
-                });
-
-                if (isOwner || isSuperAdmin) {
-                    await deleteDoc(doc(db, 'zones', id));
-                    console.log("deleteZone: Document deleted successfully");
-                } else {
-                    console.error("Unauthorized: Only owners or super admins can delete zones");
-                }
-            }
-        } catch (error) {
-            console.error("Error deleting zone:", error);
+        if (!adminUser?.id) return;
+        // Verify ownership before deleting
+        const zoneDoc = await getDoc(doc(db, 'zones', id));
+        if (zoneDoc.exists() && zoneDoc.data().adminId === adminUser.id) {
+            await deleteDoc(doc(db, 'zones', id));
+        } else {
+            console.error("Unauthorized delete attempt or zone not found");
         }
     };
 
@@ -318,23 +277,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const { id, ...data } = updatedZone;
         if (!id) return;
 
-        try {
-            const zoneDoc = await getDoc(doc(db, 'zones', id));
-            if (zoneDoc.exists()) {
-                const zoneData = zoneDoc.data();
-                const isOwner = zoneData.adminId === adminUser.id;
-                const isSuperAdmin = adminUser.role === 'SUPER_ADMIN';
-
-                if (isOwner || isSuperAdmin) {
-                    // Si c'est un super admin, on garde l'adminId d'origine ou on le met à jour
-                    const targetAdminId = isSuperAdmin ? (zoneData.adminId || adminUser.id) : adminUser.id;
-                    await updateDoc(doc(db, 'zones', id), { ...data, adminId: targetAdminId } as any);
-                } else {
-                    console.error("Unauthorized: Only owners or super admins can update zones");
-                }
-            }
-        } catch (error) {
-            console.error("Error updating zone:", error);
+        // Verify ownership before updating
+        const zoneDoc = await getDoc(doc(db, 'zones', id));
+        if (zoneDoc.exists() && zoneDoc.data().adminId === adminUser.id) {
+            await updateDoc(doc(db, 'zones', id), { ...data, adminId: adminUser.id } as any);
+        } else {
+            console.error("Unauthorized update attempt or zone not found");
         }
     };
 
@@ -428,28 +376,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setIsKioskAdmin(false);
     };
 
-    // Security: invalidates session on background with a grace period for redirects
+    // Security: invalidates session on background
     useEffect(() => {
-        let timeoutId: NodeJS.Timeout;
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'hidden' && isKioskAdmin) {
-                console.log("App backgrounded, scheduling session revocation...");
-                // 2 second grace period to allow for window.location redirects or quick accidental backgrounding
-                timeoutId = setTimeout(() => {
-                    if (document.visibilityState === 'hidden') {
-                        console.log("Session revoked after grace period.");
-                        disableKioskAdmin();
-                    }
-                }, 2000);
-            } else if (document.visibilityState === 'visible') {
-                if (timeoutId) clearTimeout(timeoutId);
+                console.log("App backgrounded, revoking kiosk session.");
+                disableKioskAdmin();
             }
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-            if (timeoutId) clearTimeout(timeoutId);
-        };
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
     }, [isKioskAdmin]);
 
 
@@ -535,7 +471,6 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             exitImpersonation,
             superAdminSession,
             globalSchedule,
-            isScheduleSet,
             updateGlobalSchedule,
             setDetectedAdminId,
             uploadEmployeePhoto
