@@ -4,13 +4,17 @@ import * as faceapi from 'face-api.js';
 import { useStore } from '../context/StoreContext';
 import { MapPin, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { getDistance } from 'geolib';
+import { useLanguage } from '../context/LanguageContext';
 import { playSuccessBeep } from '../utils/sound';
 import type { Zone } from '../types';
 import AdminAccessButton from '../components/AdminAccessButton';
 import AdminSuccessModal from '../components/AdminSuccessModal';
 import clsx from 'clsx';
+import { useNavigate } from 'react-router-dom';
 
 const AttendancePage: React.FC = () => {
+    const navigate = useNavigate();
+    const { t } = useLanguage();
     const { employees, zones, logs, addLog, modelsLoaded, enableKioskAdmin, setDetectedAdminId } = useStore();
     const webcamRef = useRef<Webcam>(null);
 
@@ -35,7 +39,7 @@ const AttendancePage: React.FC = () => {
     // GPS Tracking
     useEffect(() => {
         if (!navigator.geolocation) {
-            setError("Géolocalisation non supportée.");
+            setError(t('attendance.gps_not_supported'));
             return;
         }
 
@@ -43,9 +47,9 @@ const AttendancePage: React.FC = () => {
             (position) => {
                 const { latitude, longitude, accuracy } = position.coords;
                 setLocation({ lat: latitude, lng: longitude, accuracy });
-                setError(prev => (accuracy > 100 ? "Localisation imprécise. Activez le GPS." : (prev?.includes("Localisation") ? null : prev)));
+                setError(prev => (accuracy > 100 ? t('attendance.gps_imprecise') : (prev?.includes("Localisation") || prev?.includes("Inaccurate") || prev?.includes("دقيق") ? null : prev)));
             },
-            (err) => setError("Erreur GPS: " + err.message),
+            (err) => setError(t('attendance.gps_error') + ": " + err.message),
             { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
         );
 
@@ -157,9 +161,9 @@ const AttendancePage: React.FC = () => {
                 await new Promise(r => setTimeout(r, 300));
             }
 
-            if (!detection) throw new Error("Visage non détecté.");
+            if (!detection) throw new Error(t('attendance.face_not_detected'));
             const match = new faceapi.FaceMatcher(labeledDescriptors, 0.6).findBestMatch(detection.descriptor);
-            if (match.label === 'unknown') throw new Error("Visage non reconnu.");
+            if (match.label === 'unknown') throw new Error(t('attendance.face_not_recognized'));
 
             const emp = employees.find(e => e.id === match.label);
             if (emp) {
@@ -181,17 +185,17 @@ const AttendancePage: React.FC = () => {
         }
     };
 
-    if (!modelsLoaded) return <div className="flex h-full items-center justify-center p-8"><Loader2 className="animate-spin text-blue-600" size={48} /></div>;
+    if (!modelsLoaded) return <div className="flex flex-col h-full items-center justify-center p-8 text-center"><Loader2 className="animate-spin text-blue-600 mb-4" size={48} /><p className="text-gray-400 font-medium italic">{t('attendance.loading_models')}</p></div>;
 
     if (status === 'success') return (
         <div className="flex flex-col items-center justify-center h-[80vh] p-4 text-center animate-in zoom-in duration-300">
             <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-green-500 shadow-xl mb-6">
                 {matchedPhoto ? <img src={matchedPhoto} className="w-full h-full object-cover" alt="" /> : <CheckCircle size={128} className="text-green-500 p-4" />}
             </div>
-            <h2 className="text-2xl font-bold text-green-800">Pointage Réussi !</h2>
-            <p className="text-lg text-gray-700 mt-2">Bonjour, {matchedEmployee}</p>
+            <h2 className="text-2xl font-bold text-green-800">{t('attendance.success_title')}</h2>
+            <p className="text-lg text-gray-700 mt-2">{t('attendance.welcome')}, {matchedEmployee}</p>
             <div className={clsx("mt-4 px-6 py-2 rounded-full text-sm font-bold", lastLogType === 'check-in' ? "bg-blue-100 text-blue-700" : "bg-orange-100 text-orange-700")}>
-                {lastLogType === 'check-in' ? 'ENTRÉE ENREGISTRÉE' : 'SORTIE ENREGISTRÉE'}
+                {lastLogType === 'check-in' ? t('attendance.check_in_recorded') : t('attendance.check_out_recorded')}
             </div>
         </div>
     );
@@ -206,8 +210,8 @@ const AttendancePage: React.FC = () => {
                     <div className="bg-blue-50 p-6 rounded-full mb-6 animate-bounce">
                         <MapPin className="h-12 w-12 text-blue-600" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-800 mb-3">Détection du site...</h2>
-                    <p className="text-gray-600 mb-6">Veuillez vous approcher de votre lieu de travail pour activer le pointage.</p>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-3">{t('attendance.site_detection')}</h2>
+                    <p className="text-gray-600 mb-6">{t('attendance.site_instruction')}</p>
                     {location && <div className="text-xs font-mono text-gray-400 bg-gray-50 px-3 py-1 rounded">GPS: {location.lat.toFixed(5)}, {location.lng.toFixed(5)} (±{Math.round(location.accuracy)}m)</div>}
                 </div>
             )}
@@ -216,8 +220,8 @@ const AttendancePage: React.FC = () => {
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex items-center gap-4">
                     <div className="bg-blue-600 p-3 rounded-xl text-white"><MapPin size={24} /></div>
                     <div className="flex-1">
-                        <h2 className="text-xl font-bold text-gray-800">{currentZone?.name || 'Localisation...'}</h2>
-                        <p className="text-xs text-gray-400">Site détecté via GPS</p>
+                        <h2 className="text-xl font-bold text-gray-800">{currentZone?.name || t('attendance.site_detection')}</h2>
+                        <p className="text-xs text-gray-400">{t('attendance.site_detected_via_gps')}</p>
                     </div>
                 </div>
 
@@ -236,7 +240,7 @@ const AttendancePage: React.FC = () => {
                     disabled={status === 'processing' || !currentZone}
                     className="w-full py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-xl shadow-xl transition-all active:scale-95 disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none"
                 >
-                    {status === 'processing' ? 'VÉRIFICATION...' : 'POINTER MA PRÉSENCE'}
+                    {status === 'processing' ? t('attendance.verifying') : t('attendance.check_in_button')}
                 </button>
             </div>
         </div>

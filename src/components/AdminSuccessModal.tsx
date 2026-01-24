@@ -1,5 +1,6 @@
 import React from 'react';
 import { ShieldCheck, ArrowRight } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 interface AdminSuccessModalProps {
     isOpen: boolean;
@@ -8,6 +9,7 @@ interface AdminSuccessModalProps {
 }
 
 const AdminSuccessModal: React.FC<AdminSuccessModalProps> = ({ isOpen, onClose, employeeName }) => {
+    const { t } = useLanguage();
     if (!isOpen) return null;
 
     return (
@@ -19,22 +21,22 @@ const AdminSuccessModal: React.FC<AdminSuccessModalProps> = ({ isOpen, onClose, 
                     </div>
 
                     <h2 className="text-2xl font-bold text-white mb-2 tracking-wide">
-                        Accès Administrateur Activé
+                        {t('kiosk.success_title')}
                     </h2>
 
                     <div className="w-16 h-1 bg-amber-400 rounded-full mb-6"></div>
 
                     <p className="text-green-100 mb-8 leading-relaxed">
-                        Identité confirmée : <span className="font-bold text-amber-300">{employeeName}</span>.
+                        {t('kiosk.identity_confirmed')} : <span className="font-bold text-amber-300">{employeeName}</span>.
                         <br />
-                        Vous disposez désormais des droits de gestion sur cette borne de pointage.
+                        {t('kiosk.rights_granted')}
                     </p>
 
                     <button
                         onClick={onClose}
                         className="w-full bg-amber-500 hover:bg-amber-400 text-green-950 font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-lg active:scale-95"
                     >
-                        Accéder au panneau de contrôle
+                        {t('kiosk.access_control_panel')}
                         <ArrowRight size={20} />
                     </button>
                 </div>

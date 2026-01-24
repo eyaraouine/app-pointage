@@ -2,8 +2,10 @@ import { useNavigate, Outlet, Link, useLocation } from 'react-router-dom';
 import { Users, MapPin, ClipboardList, UserCheck, LogOut, LogIn, User, House, Shield, Activity, X, BarChart2 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
 import clsx from 'clsx';
+import { useLanguage } from '../context/LanguageContext';
 
 const Layout: React.FC = () => {
+    const { t } = useLanguage();
     const location = useLocation();
     const navigate = useNavigate();
     const { adminUser, logoutAdmin, isKioskAdmin, disableKioskAdmin, superAdminSession, exitImpersonation } = useStore();
@@ -13,16 +15,16 @@ const Layout: React.FC = () => {
     const isImpersonating = !!superAdminSession;
 
     const navItems = [
-        { path: '/home', icon: House, label: 'Accueil' },
-        { path: '/', icon: UserCheck, label: 'Pointer' },
+        { path: '/home', icon: House, label: t('nav.home') },
+        { path: '/', icon: UserCheck, label: t('nav.attendance') },
         ...(isSuperAdmin ? [
-            { path: '/super-admin/dashboard', icon: Activity, label: 'Global' },
-            { path: '/super-admin/instances', icon: Shield, label: 'Instances' },
+            { path: '/super-admin/dashboard', icon: Activity, label: t('nav.global') },
+            { path: '/super-admin/instances', icon: Shield, label: t('nav.instances') },
         ] : showAdminNav ? [
-            { path: '/admin/employees', icon: Users, label: 'Employés' },
-            { path: '/admin/zones', icon: MapPin, label: 'Zones' },
-            { path: '/admin/logs', icon: ClipboardList, label: 'Journal' },
-            { path: '/admin/analyses', icon: BarChart2, label: 'Analyses' },
+            { path: '/admin/employees', icon: Users, label: t('nav.employees') },
+            { path: '/admin/zones', icon: MapPin, label: t('nav.zones') },
+            { path: '/admin/logs', icon: ClipboardList, label: t('nav.logs') },
+            { path: '/admin/analyses', icon: BarChart2, label: t('nav.analyses') },
         ] : []),
     ];
 
@@ -52,8 +54,8 @@ const Layout: React.FC = () => {
                     </button>
                 </div>
             )}
-            <header className={clsx("text-white p-4 shadow-md z-10 flex justify-between items-center", isSuperAdmin ? "bg-gray-900" : "bg-blue-600")}>
-                <h1 className="text-xl font-bold">Pointage Mobile</h1>
+            <header className={clsx("text-white p-4 shadow-md z-10 flex justify-between items-center transition-all duration-500", isSuperAdmin ? "bg-gray-900" : "bg-blue-600")}>
+                <h1 className="text-xl font-bold tracking-tight">Hodour</h1>
                 {showAdminNav ? (
                     <div className="flex items-center gap-3">
                         <div className="flex items-center gap-1 text-sm bg-blue-700 px-3 py-1 rounded-full">
@@ -62,8 +64,8 @@ const Layout: React.FC = () => {
                         </div>
                         <button
                             onClick={handleLogout}
-                            className="p-1 hover:bg-blue-700 rounded-full transition-colors"
-                            title="Déconnexion"
+                            className="p-1 hover:bg-blue-700 rounded-full transition-colors mx-2"
+                            title={t('common.logout')}
                         >
                             <LogOut size={20} />
                         </button>
@@ -75,7 +77,7 @@ const Layout: React.FC = () => {
                             className="flex items-center gap-1 text-sm bg-blue-700 px-3 py-1 rounded-full hover:bg-blue-800 transition-colors"
                         >
                             <LogIn size={14} />
-                            <span>Admin</span>
+                            <span>{t('common.admin')}</span>
                         </Link>
                     )
                 )}

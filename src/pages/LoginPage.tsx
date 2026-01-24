@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
+import { useLanguage } from '../context/LanguageContext';
 import { LogIn, AlertCircle } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
+    const { t } = useLanguage();
     const navigate = useNavigate();
     const location = useLocation();
     const from = (location.state as any)?.from?.pathname || "/admin/employees";
@@ -32,10 +34,10 @@ const LoginPage: React.FC = () => {
             if (success) {
                 navigate(from, { replace: true });
             } else {
-                setError("Email ou mot de passe incorrect.");
+                setError(t('login.auth_error'));
             }
         } catch (err) {
-            setError("Une erreur est survenue lors de la connexion.");
+            setError(t('login.general_error'));
         } finally {
             setLoading(false);
         }
@@ -48,24 +50,24 @@ const LoginPage: React.FC = () => {
                     <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
                         <LogIn className="text-blue-600" size={32} />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-800">Connexion Admin</h2>
-                    <p className="text-gray-500 text-sm mt-1">Accédez à l'espace d'administration</p>
+                    <h2 className="text-2xl font-bold text-gray-800">{t('login.title')}</h2>
+                    <p className="text-gray-500 text-sm mt-1">{t('login.subtitle')}</p>
                 </div>
 
                 {!hasAdmin && (
                     <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3 text-amber-800">
                         <AlertCircle className="text-amber-600 mt-0.5 flex-shrink-0" size={20} />
                         <div>
-                            <p className="font-bold text-sm">Aucun compte administrateur</p>
-                            <p className="text-xs mt-1">Vous devez d'abord créer un compte super admin pour accéder à ces fonctionnalités.</p>
-                            <Link to="/register" className="text-xs font-bold underline mt-2 inline-block">Créer un compte</Link>
+                            <p className="font-bold text-sm">{t('login.no_admin_title')}</p>
+                            <p className="text-xs mt-1">{t('login.no_admin_text')}</p>
+                            <Link to="/register" className="text-xs font-bold underline mt-2 inline-block">{t('login.create_account')}</Link>
                         </div>
                     </div>
                 )}
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">{t('login.email')}</label>
                         <input
                             type="email"
                             value={email}
@@ -78,9 +80,9 @@ const LoginPage: React.FC = () => {
 
                     <div>
                         <div className="flex justify-between items-center mb-1">
-                            <label className="block text-sm font-medium text-gray-700">Mot de passe</label>
-                            <Link to="/forgot-password" title="Mot de passe oublié ?" className="text-xs text-blue-600 hover:underline">
-                                Mot de passe oublié ?
+                            <label className="block text-sm font-medium text-gray-700">{t('login.password')}</label>
+                            <Link to="/forgot-password" title={t('login.forgot_password')} className="text-xs text-blue-600 hover:underline">
+                                {t('login.forgot_password')}
                             </Link>
                         </div>
                         <input
@@ -105,15 +107,15 @@ const LoginPage: React.FC = () => {
                         disabled={loading}
                         className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {loading ? "Connexion..." : "Se connecter"}
+                        {loading ? t('login.logging_in') : t('login.login_button')}
                     </button>
                 </form>
 
                 <div className="mt-8 pt-6 border-t border-gray-100 text-center">
                     <p className="text-sm text-gray-500">
-                        Pas encore de compte ?{' '}
+                        {t('login.no_account')}{' '}
                         <Link to="/register" className="text-blue-600 font-bold hover:underline">
-                            S'inscrire
+                            {t('login.register')}
                         </Link>
                     </p>
                 </div>
@@ -121,7 +123,7 @@ const LoginPage: React.FC = () => {
 
             <Link to="/" className="mt-8 text-gray-500 hover:text-blue-600 flex items-center gap-2 transition-colors">
                 <LogIn size={18} className="rotate-180" />
-                Retour au pointage
+                {t('login.back_to_attendance')}
             </Link>
         </div>
     );
