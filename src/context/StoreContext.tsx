@@ -222,13 +222,28 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return () => unsubAuth();
     }, []);
 
+    // Helper for timeouts
+    const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> => {
+        return Promise.race([
+            promise,
+            new Promise<T>((_, reject) =>
+                setTimeout(() => reject(new Error(message)), timeoutMs)
+            )
+        ]);
+    };
+
     const addEmployee = async (employee: Employee) => {
         const { id, ...data } = employee;
         // Ensure we don't save the massive base64 in Firestore anymore if photoURL exists
         const finalData = { ...data, adminId: adminUser?.id };
         if (data.photoURL) delete (finalData as any).photo;
 
-        await addDoc(collection(db, 'employees'), finalData);
+        console.log("Saving employee to Firestore...");
+        await withTimeout(
+            addDoc(collection(db, 'employees'), finalData),
+            10000,
+            "Le serveur Firestore ne répond pas (Timeout 10s)"
+        );
     };
 
     const updateEmployee = async (employee: Employee) => {
@@ -237,16 +252,33 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const finalData = { ...data };
         if (data.photoURL) delete (finalData as any).photo;
 
-        await updateDoc(doc(db, 'employees', id), finalData as any);
+        console.log("Updating employee in Firestore...");
+        await withTimeout(
+            updateDoc(doc(db, 'employees', id), finalData as any),
+            10000,
+            "Le serveur Firestore ne répond pas (Timeout 10s)"
+        );
     };
 
     const uploadEmployeePhoto = async (employeeId: string, base64: string) => {
         // Remove data:image/jpeg;base64, prefix if present
         const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
         const storageRef = ref(storage, `employees/${employeeId}.jpg`);
-        await uploadString(storageRef, base64Data, 'base64', { contentType: 'image/jpeg' });
-        const url = await getDownloadURL(storageRef);
-        return url;
+
+        console.log("Uploading photo to Firebase Storage...", employeeId);
+        try {
+            await withTimeout(
+                uploadString(storageRef, base64Data, 'base64', { contentType: 'image/jpeg' }),
+                15000,
+                "Téléchargement de la photo trop long (Timeout 15s)"
+            );
+            const url = await getDownloadURL(storageRef);
+            console.log("Photo uploaded successfully:", url);
+            return url;
+        } catch (error) {
+            console.error("Storage upload failed:", error);
+            throw error;
+        }
     };
 
     const deleteEmployee = async (id: string) => {

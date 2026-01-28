@@ -36,6 +36,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
     const [isCapturing, setIsCapturing] = useState(false);
     const [capturedImage, setCapturedImage] = useState<string | null>(employeeToEdit?.photoURL || employeeToEdit?.photo || null);
     const [processing, setProcessing] = useState(false);
+    const [processingStep, setProcessingStep] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
     const [showSuccess, setShowSuccess] = useState(false);
 
@@ -66,6 +67,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
         }
 
         setProcessing(true);
+        setProcessingStep('Vérification...');
         setError(null);
 
         try {
@@ -99,9 +101,10 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
                 img.onerror = () => reject(new Error("Impossible de charger l'image capturée."));
             });
 
+            setProcessingStep('Détection du visage...');
             const detection = await faceapi.detectSingleFace(
                 img,
-                new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.3 })
+                new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 })
             ).withFaceLandmarks().withFaceDescriptor();
 
             if (!detection) {
@@ -111,6 +114,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
             }
 
             // 3. Face Duplicate Check
+            setProcessingStep('Vérification des doublons...');
             const hasNewPhoto = capturedImage !== (employeeToEdit?.photoURL || employeeToEdit?.photo);
             if (hasNewPhoto && labeledDescriptors.length > 0) {
                 const faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.5);
@@ -129,11 +133,13 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
             const isBase64 = capturedImage.startsWith('data:image');
 
             if (isBase64) {
-                const tempId = employeeToEdit?.id || crypto.randomUUID();
+                setProcessingStep('Téléchargement de la photo...');
+                const tempId = employeeToEdit?.id || (typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2));
                 photoURL = await uploadEmployeePhoto(tempId, capturedImage);
             }
 
             // 5. Save/Update employee
+            setProcessingStep('Enregistrement...');
             const employeeData = {
                 id: employeeToEdit?.id || '',
                 firstName,
@@ -163,9 +169,10 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
             }, 2000);
         } catch (err: any) {
             console.error("Face processing error:", err);
-            setError(`Erreur: ${err.message || "Problème lors du traitement de la photo"}`);
+            setError(`Erreur (${processingStep}): ${err.message || "Problème lors du traitement"}`);
         } finally {
             setProcessing(false);
+            setProcessingStep('');
         }
     };
 
@@ -310,7 +317,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
                     ) : processing ? (
                         <>
                             <Loader2 size={20} className="animate-spin" />
-                            Traitement...
+                            {processingStep || 'Traitement...'}
                         </>
                     ) : (
                         <>
