@@ -294,27 +294,39 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const deleteZone = async (id: string) => {
-        if (!adminUser?.id) {
+        const effectiveAdminId = adminUser?.id || kioskAdminId;
+        if (!effectiveAdminId) {
             throw new Error("Vous devez être connecté pour supprimer une zone.");
         }
 
+        console.log(`[deleteZone] Attempting to delete zone: ${id} as admin: ${effectiveAdminId}`);
         try {
-            const zoneDoc = await getDoc(doc(db, 'zones', id));
+            const zoneDoc = await withTimeout(
+                getDoc(doc(db, 'zones', id)),
+                10000,
+                "Le serveur Firestore ne répond pas (Timeout 10s)"
+            );
+
             if (!zoneDoc.exists()) {
                 throw new Error("Zone introuvable.");
             }
 
-            const isSuperAdmin = adminUser.role === 'SUPER_ADMIN';
-            const isOwner = zoneDoc.data().adminId === adminUser.id;
+            const isSuperAdmin = adminUser?.role === 'SUPER_ADMIN';
+            const isOwner = zoneDoc.data().adminId === effectiveAdminId;
 
             if (isSuperAdmin || isOwner) {
-                await deleteDoc(doc(db, 'zones', id));
-                console.log(`Zone ${id} deleted successfully`);
+                await withTimeout(
+                    deleteDoc(doc(db, 'zones', id)),
+                    10000,
+                    "Échec de la suppression (Timeout 10s)"
+                );
+                console.log(`[deleteZone] Zone ${id} deleted successfully`);
             } else {
+                console.warn(`[deleteZone] Unauthorized. Zone owner: ${zoneDoc.data().adminId}, Current: ${effectiveAdminId}`);
                 throw new Error("Vous n'avez pas l'autorisation de supprimer cette zone (Propriétaire différent).");
             }
         } catch (error: any) {
-            console.error("Delete zone error:", error);
+            console.error("[deleteZone] Error:", error);
             throw new Error(error.message || "Erreur lors de la suppression de la zone.");
         }
     };

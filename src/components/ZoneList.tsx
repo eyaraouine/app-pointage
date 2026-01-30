@@ -34,12 +34,18 @@ const ZoneList: React.FC = () => {
 
                     <button
                         onClick={async () => {
+                            console.log(`[ZoneList] Delete button clicked for zone: ${zone.id} (${zone.name})`);
                             if (window.confirm(`Supprimer la zone "${zone.name}" ?`)) {
                                 try {
+                                    console.log(`[ZoneList] Confirmation OK. Calling deleteZone...`);
                                     await deleteZone(zone.id);
+                                    console.log(`[ZoneList] deleteZone call finished.`);
                                 } catch (error: any) {
+                                    console.error(`[ZoneList] Catching error in UI:`, error);
                                     alert(error.message || "La suppression a échoué.");
                                 }
+                            } else {
+                                console.log(`[ZoneList] Confirmation cancelled.`);
                             }
                         }}
                         className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
