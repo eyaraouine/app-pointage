@@ -294,13 +294,28 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const deleteZone = async (id: string) => {
-        if (!adminUser?.id) return;
-        // Verify ownership before deleting
-        const zoneDoc = await getDoc(doc(db, 'zones', id));
-        if (zoneDoc.exists() && zoneDoc.data().adminId === adminUser.id) {
-            await deleteDoc(doc(db, 'zones', id));
-        } else {
-            console.error("Unauthorized delete attempt or zone not found");
+        if (!adminUser?.id) {
+            throw new Error("Vous devez être connecté pour supprimer une zone.");
+        }
+
+        try {
+            const zoneDoc = await getDoc(doc(db, 'zones', id));
+            if (!zoneDoc.exists()) {
+                throw new Error("Zone introuvable.");
+            }
+
+            const isSuperAdmin = adminUser.role === 'SUPER_ADMIN';
+            const isOwner = zoneDoc.data().adminId === adminUser.id;
+
+            if (isSuperAdmin || isOwner) {
+                await deleteDoc(doc(db, 'zones', id));
+                console.log(`Zone ${id} deleted successfully`);
+            } else {
+                throw new Error("Vous n'avez pas l'autorisation de supprimer cette zone (Propriétaire différent).");
+            }
+        } catch (error: any) {
+            console.error("Delete zone error:", error);
+            throw new Error(error.message || "Erreur lors de la suppression de la zone.");
         }
     };
 
