@@ -27,9 +27,12 @@ const EmployeesPage: React.FC = () => {
     return (
         <div className="p-4 max-w-4xl mx-auto">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">
-                    {editingEmployee ? 'Modifier l\'Employé' : 'Gestion des Employés'}
-                </h2>
+                <div className="flex items-center gap-2">
+                    <h2 className="text-2xl font-bold text-gray-800">
+                        {editingEmployee ? 'Modifier l\'Employé' : 'Gestion des Employés'}
+                    </h2>
+                    <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 text-[10px] font-black rounded-md uppercase tracking-tighter border border-blue-100">v1.2</span>
+                </div>
                 <div className="flex gap-2">
                     {!showForm && (
                         <button
@@ -46,8 +49,8 @@ const EmployeesPage: React.FC = () => {
                     <button
                         onClick={showForm ? handleCancel : () => setShowForm(true)}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl transition-all font-semibold shadow-md active:scale-95 ${showForm
-                                ? 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-                                : 'bg-blue-600 text-white hover:bg-blue-700'
+                            ? 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                            : 'bg-blue-600 text-white hover:bg-blue-700'
                             }`}
                     >
                         {showForm ? (
