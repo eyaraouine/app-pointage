@@ -57,7 +57,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ onEdit, onSetSchedule }) =>
                             {employee.hasCustomSchedule && (
                                 <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full flex items-center gap-1 font-bold border border-blue-100">
                                     <CalendarCheck size={10} />
-                                    PLANNIG SPÉCIFIQUE
+                                    PLANNING SPÉCIFIQUE
                                 </span>
                             )}
                         </div>
@@ -65,7 +65,7 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ onEdit, onSetSchedule }) =>
                     <div className="ml-auto flex items-center gap-1">
                         <button
                             onClick={() => onSetSchedule(employee)}
-                            className="p-2 text-gray-400 hover:text-orange-600 transition-colors"
+                            className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
                             title="Planning spécifique"
                         >
                             <Settings size={20} />

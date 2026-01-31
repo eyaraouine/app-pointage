@@ -252,12 +252,16 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         const finalData = { ...data };
         if (data.photoURL) delete (finalData as any).photo;
 
-        console.log("Updating employee in Firestore...");
-        await withTimeout(
-            updateDoc(doc(db, 'employees', id), finalData as any),
-            10000,
-            "Le serveur Firestore ne répond pas (Timeout 10s)"
-        );
+        try {
+            await withTimeout(
+                updateDoc(doc(db, 'employees', id), finalData as any),
+                10000,
+                "Le serveur Firestore ne répond pas (Timeout 10s)"
+            );
+        } catch (error: any) {
+            console.error('Error updating employee:', error);
+            throw error;
+        }
     };
 
     const uploadEmployeePhoto = async (employeeId: string, base64: string) => {
@@ -295,39 +299,19 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const deleteZone = async (id: string) => {
         const effectiveAdminId = adminUser?.id || kioskAdminId;
+
         if (!effectiveAdminId) {
-            throw new Error("Vous devez être connecté pour supprimer une zone.");
+            throw new Error("Authentification requise pour supprimer une zone.");
         }
 
-        console.log(`[deleteZone] Attempting to delete zone: ${id} as admin: ${effectiveAdminId}`);
         try {
-            const zoneDoc = await withTimeout(
-                getDoc(doc(db, 'zones', id)),
-                10000,
-                "Le serveur Firestore ne répond pas (Timeout 10s)"
-            );
-
-            if (!zoneDoc.exists()) {
-                throw new Error("Zone introuvable.");
-            }
-
-            const isSuperAdmin = adminUser?.role === 'SUPER_ADMIN';
-            const isOwner = zoneDoc.data().adminId === effectiveAdminId;
-
-            if (isSuperAdmin || isOwner) {
-                await withTimeout(
-                    deleteDoc(doc(db, 'zones', id)),
-                    10000,
-                    "Échec de la suppression (Timeout 10s)"
-                );
-                console.log(`[deleteZone] Zone ${id} deleted successfully`);
-            } else {
-                console.warn(`[deleteZone] Unauthorized. Zone owner: ${zoneDoc.data().adminId}, Current: ${effectiveAdminId}`);
-                throw new Error("Vous n'avez pas l'autorisation de supprimer cette zone (Propriétaire différent).");
-            }
+            await deleteDoc(doc(db, 'zones', id));
         } catch (error: any) {
-            console.error("[deleteZone] Error:", error);
-            throw new Error(error.message || "Erreur lors de la suppression de la zone.");
+            console.error("[deleteZone] Error details:", error);
+            if (error.code === 'permission-denied') {
+                throw new Error("Permission refusée par Firebase (Règles Firestore).");
+            }
+            throw new Error(error.message || "Erreur de communication avec la base de données.");
         }
     };
 
@@ -495,7 +479,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const updateGlobalSchedule = async (schedule: Schedule) => {
         if (!adminUser?.id) return;
-        await setDoc(doc(db, 'settings', `schedule_${adminUser.id}`), schedule);
+        try {
+            await setDoc(doc(db, 'settings', `schedule_${adminUser.id}`), schedule);
+            setGlobalSchedule(schedule);
+        } catch (error: any) {
+            console.error('Error updating global schedule:', error);
+        }
     };
 
     return (
