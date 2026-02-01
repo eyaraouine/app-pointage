@@ -46,6 +46,7 @@ interface StoreContextType {
     modelsLoaded: boolean;
     loadingError: string | null;
     isKioskAdmin: boolean;
+    kioskAdminId: string | null;
     enableKioskAdmin: (adminId?: string) => void;
     disableKioskAdmin: () => void;
     // Super Admin Features
@@ -214,8 +215,10 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                     role: adminData.role,
                     suspended: adminData.suspended
                 });
+                alert(`🔓 AUTH SUCESS: Connecté en tant que ${user.uid}`);
             } else {
                 setAdminUser(null);
+                // alert("🔒 AUTH: Déconnecté");
             }
         });
 
@@ -233,43 +236,61 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     const addEmployee = async (employee: Employee) => {
+        const effectiveId = adminUser?.id || kioskAdminId;
+        alert(`debug: addEmployee - effectiveId: ${effectiveId}`);
+
+        if (!effectiveId) {
+            alert("❌ Erreur: ID administrateur manquant. Réessayez de vous connecter.");
+            throw new Error("ID administrateur manquant.");
+        }
+
         const { id, ...data } = employee;
-        // Ensure we don't save the massive base64 in Firestore anymore if photoURL exists
-        const finalData = { ...data, adminId: adminUser?.id };
+        const finalData = { ...data, adminId: effectiveId };
         if (data.photoURL) delete (finalData as any).photo;
 
-        console.log("Saving employee to Firestore...");
-        await withTimeout(
-            addDoc(collection(db, 'employees'), finalData),
-            10000,
-            "Le serveur Firestore ne répond pas (Timeout 10s)"
-        );
+        alert("📡 Tentative d'enregistrement de l'employé...");
+        try {
+            await withTimeout(
+                addDoc(collection(db, 'employees'), finalData),
+                10000,
+                "Le serveur Firestore ne répond pas (Timeout 10s)"
+            );
+            alert("✅ Employé enregistré !");
+        } catch (error: any) {
+            alert(`❌ Échec enregistrement: ${error.message}`);
+            throw error;
+        }
     };
 
     const updateEmployee = async (employee: Employee) => {
         const { id, ...data } = employee;
+        alert(`debug: updateEmployee - ID: ${id}`);
         if (!id) return;
         const finalData = { ...data };
         if (data.photoURL) delete (finalData as any).photo;
 
+        alert("📡 Mise à jour en cours...");
         try {
             await withTimeout(
                 updateDoc(doc(db, 'employees', id), finalData as any),
                 10000,
-                "Le serveur Firestore ne répond pas (Timeout 10s)"
+                "Temps d'attente dépassé pour la mise à jour."
             );
+            alert("✅ Employé mis à jour !");
         } catch (error: any) {
+            alert(`❌ Échec mise à jour: ${error.message}`);
             console.error('Error updating employee:', error);
             throw error;
         }
     };
 
     const uploadEmployeePhoto = async (employeeId: string, base64: string) => {
+        alert(`debug: uploadEmployeePhoto - ID: ${employeeId}`);
         // Remove data:image/jpeg;base64, prefix if present
         const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
         const storageRef = ref(storage, `employees/${employeeId}.jpg`);
 
-        console.log("Uploading photo to Firebase Storage...", employeeId);
+        alert("📡 Upload photo vers Firebase Storage...");
         try {
             await withTimeout(
                 uploadString(storageRef, base64Data, 'base64', { contentType: 'image/jpeg' }),
@@ -277,54 +298,97 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 "Téléchargement de la photo trop long (Timeout 15s)"
             );
             const url = await getDownloadURL(storageRef);
-            console.log("Photo uploaded successfully:", url);
+            alert("✅ Photo enregistrée ! URL obtenue.");
             return url;
-        } catch (error) {
+        } catch (error: any) {
+            alert(`❌ Échec upload photo: ${error.message}`);
             console.error("Storage upload failed:", error);
             throw error;
         }
     };
 
     const deleteEmployee = async (id: string) => {
-        await deleteDoc(doc(db, 'employees', id));
+        alert(`debug: deleteEmployee - ID: ${id}`);
+        try {
+            await withTimeout(
+                deleteDoc(doc(db, 'employees', id)),
+                10000,
+                "Temps d'attente dépassé pour la suppression de l'employé."
+            );
+            alert("✅ Employé supprimé !");
+        } catch (error: any) {
+            alert(`❌ Échec suppression: ${error.message}`);
+            throw error;
+        }
     };
 
     const addZone = async (zone: Omit<Zone, 'id'>) => {
-        if (!adminUser?.id) throw new Error("Authentication required to add zone");
-        await addDoc(collection(db, 'zones'), {
-            ...zone,
-            adminId: adminUser.id
-        });
+        const effectiveId = adminUser?.id || kioskAdminId;
+        alert(`debug: addZone - AdminID: ${effectiveId}`);
+
+        if (!effectiveId) {
+            alert("❌ Erreur: Authentification requise pour ajouter une zone.");
+            throw new Error("Authentication required to add zone");
+        }
+
+        alert("📡 Ajout de la zone...");
+        try {
+            await withTimeout(
+                addDoc(collection(db, 'zones'), {
+                    ...zone,
+                    adminId: effectiveId
+                }),
+                10000,
+                "Temps d'attente dépassé pour l'ajout de zone."
+            );
+            alert("✅ Zone ajoutée !");
+        } catch (error: any) {
+            alert(`❌ Échec ajout zone: ${error.message}`);
+            throw error;
+        }
     };
 
     const deleteZone = async (id: string) => {
         const effectiveAdminId = adminUser?.id || kioskAdminId;
+        alert(`debug: deleteZone - ID: ${id}, AdminID: ${effectiveAdminId}`);
 
         if (!effectiveAdminId) {
+            alert("❌ Erreur: Pas d'ID administrateur trouvé.");
             throw new Error("Authentification requise pour supprimer une zone.");
         }
 
+        alert("📡 Suppression en cours...");
         try {
-            await deleteDoc(doc(db, 'zones', id));
+            await withTimeout(
+                deleteDoc(doc(db, 'zones', id)),
+                10000,
+                "Délai d'attente dépassé lors de la suppression."
+            );
+            alert("✅ Zone supprimée avec succès !");
         } catch (error: any) {
+            alert(`❌ Échec suppression: ${error.message}`);
             console.error("[deleteZone] Error details:", error);
-            if (error.code === 'permission-denied') {
-                throw new Error("Permission refusée par Firebase (Règles Firestore).");
-            }
-            throw new Error(error.message || "Erreur de communication avec la base de données.");
+            throw error;
         }
     };
 
     const updateZone = async (updatedZone: Zone) => {
-        if (!adminUser?.id) return;
+        const effectiveId = adminUser?.id || kioskAdminId;
+        alert(`debug: updateZone - ID: ${updatedZone.id}, Admin: ${effectiveId}`);
+        if (!effectiveId) return;
+
         const { id, ...data } = updatedZone;
         if (!id) return;
 
+        alert("📡 Vérification de propriété...");
         // Verify ownership before updating
         const zoneDoc = await getDoc(doc(db, 'zones', id));
-        if (zoneDoc.exists() && zoneDoc.data().adminId === adminUser.id) {
-            await updateDoc(doc(db, 'zones', id), { ...data, adminId: adminUser.id } as any);
+        if (zoneDoc.exists() && zoneDoc.data().adminId === effectiveId) {
+            alert("📡 Envoi de la mise à jour...");
+            await updateDoc(doc(db, 'zones', id), { ...data, adminId: effectiveId } as any);
+            alert("✅ Zone mise à jour !");
         } else {
+            alert("❌ Non autorisé ou zone introuvable.");
             console.error("Unauthorized update attempt or zone not found");
         }
     };
@@ -478,11 +542,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, [adminUser?.email]);
 
     const updateGlobalSchedule = async (schedule: Schedule) => {
-        if (!adminUser?.id) return;
+        const effectiveId = adminUser?.id || kioskAdminId;
+        alert(`debug: updateGlobalSchedule - Admin: ${effectiveId}`);
+        if (!effectiveId) return;
+
+        alert("📡 Enregistrement du planning...");
         try {
-            await setDoc(doc(db, 'settings', `schedule_${adminUser.id}`), schedule);
+            await setDoc(doc(db, 'settings', `schedule_${effectiveId}`), schedule);
             setGlobalSchedule(schedule);
+            alert("✅ Planning enregistré !");
         } catch (error: any) {
+            alert(`❌ Échec enregistrement planning: ${error.message}`);
             console.error('Error updating global schedule:', error);
         }
     };
@@ -510,6 +580,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             modelsLoaded,
             loadingError,
             isKioskAdmin,
+            kioskAdminId,
             enableKioskAdmin,
             disableKioskAdmin,
             // Super Admin

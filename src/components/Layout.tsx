@@ -8,7 +8,7 @@ const Layout: React.FC = () => {
     const { t } = useLanguage();
     const location = useLocation();
     const navigate = useNavigate();
-    const { adminUser, logoutAdmin, isKioskAdmin, disableKioskAdmin, superAdminSession, exitImpersonation } = useStore();
+    const { adminUser, logoutAdmin, isKioskAdmin, kioskAdminId, disableKioskAdmin, superAdminSession, exitImpersonation } = useStore();
     const storedAuth = localStorage.getItem('User_Access_Level') === 'ADMIN_MASTER';
     const showAdminNav = adminUser || isKioskAdmin || storedAuth;
     const isSuperAdmin = adminUser?.role === 'SUPER_ADMIN';
@@ -61,6 +61,9 @@ const Layout: React.FC = () => {
                         <div className="flex items-center gap-1 text-sm bg-blue-700 px-3 py-1 rounded-full">
                             <User size={14} />
                             <span className="font-medium">{adminUser ? adminUser.name : 'Borne Admin'}</span>
+                        </div>
+                        <div className="hidden sm:block text-[10px] opacity-60 bg-black/20 px-2 py-1 rounded-md ml-2">
+                            A: {adminUser?.id?.substring(0, 6) || '---'} | K: {kioskAdminId?.substring(0, 6) || '---'}
                         </div>
                         <button
                             onClick={handleLogout}

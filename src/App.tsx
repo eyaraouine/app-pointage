@@ -18,7 +18,13 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 import { LanguageProvider } from './context/LanguageContext';
 
+import { useEffect } from 'react';
+
 function App() {
+  useEffect(() => {
+    alert("🚨 APPLICATION INITIALISÉE - SI VOUS VOYEZ CECI, LE JS EST À JOUR !");
+  }, []);
+
   return (
     <LanguageProvider>
       <StoreProvider>
