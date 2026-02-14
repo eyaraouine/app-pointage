@@ -284,8 +284,20 @@ const AnalysesPage: React.FC = () => {
                         <div key={emp.id} className="group cursor-pointer" onClick={() => setSelectedEmployeeId(emp.id)}>
                             <div className="flex items-center gap-4 mb-1">
                                 <div className={`w-12 h-12 rounded-full border-2 overflow-hidden flex-shrink-0 ${emp.status === 'absent' ? 'border-red-400' : 'border-blue-400'}`}>
-                                    {emp.photo ? (
-                                        <img src={emp.photo} alt={`${emp.firstName} profile`} className="w-full h-full object-cover" />
+                                    {(emp.photo || emp.photoURL) ? (
+                                        <img
+                                            src={emp.photo || emp.photoURL}
+                                            alt={`${emp.firstName} profile`}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                                // Fallback to generic icon if image fails to load
+                                                e.currentTarget.style.display = 'none';
+                                                const parent = e.currentTarget.parentElement;
+                                                if (parent) {
+                                                    parent.classList.add('bg-gray-100', 'flex', 'items-center', 'justify-center');
+                                                }
+                                            }}
+                                        />
                                     ) : (
                                         <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400">
                                             <User size={20} />
@@ -322,12 +334,12 @@ const AnalysesPage: React.FC = () => {
 
             {/* Widget 2: HR Management - Monthly Analysis */}
             {selectedEmployee && (
-                <section className="bg-[#1e3a8a] rounded-[40px] shadow-2xl overflow-hidden text-white flex flex-col min-h-[600px] border border-white/5">
+                <section className="bg-white rounded-3xl shadow-sm overflow-hidden flex flex-col min-h-[600px] border border-gray-100">
                     {/* Header: Title & Month Selector */}
                     <div className="p-8 pb-4 space-y-6">
                         <div className="flex items-center gap-4">
-                            <ChevronLeft size={24} className="cursor-pointer hover:scale-110 transition-transform" />
-                            <h2 className="text-xl font-black tracking-[0.2em] flex-1 text-center uppercase">Analyse mensuelle</h2>
+                            <ChevronLeft size={24} className="cursor-pointer hover:scale-110 transition-transform text-gray-600 hover:text-gray-900" />
+                            <h2 className="text-xl font-bold flex-1 text-center text-gray-900">Analyse mensuelle</h2>
                         </div>
 
                         {/* Month Selector Strip */}
@@ -342,9 +354,9 @@ const AnalysesPage: React.FC = () => {
                                         key={idx}
                                         ref={isSelected ? selectedMonthRef : null}
                                         onClick={() => setSelectedMonth(month)}
-                                        className={`flex-shrink-0 transition-all duration-500 uppercase tracking-widest text-xs font-black ${isSelected
-                                            ? 'bg-white text-blue-900 px-8 py-3 rounded-full shadow-[0_10px_20px_rgba(255,255,255,0.2)] scale-110'
-                                            : 'text-blue-200/60 hover:text-white'
+                                        className={`flex-shrink-0 transition-all duration-500 uppercase tracking-widest text-xs font-bold ${isSelected
+                                            ? 'bg-blue-600 text-white px-8 py-3 rounded-full shadow-lg scale-110'
+                                            : 'text-gray-400 hover:text-gray-700'
                                             }`}
                                     >
                                         {format(month, 'MMM.', { locale: fr })}
@@ -354,9 +366,9 @@ const AnalysesPage: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="flex-1 flex flex-col md:flex-row overflow-hidden border-t border-white/5">
+                    <div className="flex-1 flex flex-col md:flex-row overflow-hidden border-t border-gray-200">
                         {/* Sidebar: Employees List */}
-                        <aside className="w-full md:w-32 bg-blue-950/30 border-r border-white/5 flex flex-row md:flex-col overflow-x-auto md:overflow-y-auto no-scrollbar md:p-4 gap-6 p-6 items-center">
+                        <aside className="w-full md:w-32 bg-gray-50 border-r border-gray-200 flex flex-row md:flex-col overflow-x-auto md:overflow-y-auto no-scrollbar md:p-4 gap-6 p-6 items-center">
                             {employees.map((emp) => {
                                 const isActive = emp.id === selectedEmployee.id;
                                 return (
@@ -366,17 +378,28 @@ const AnalysesPage: React.FC = () => {
                                         className={`flex flex-col items-center gap-2 transition-all duration-300 group flex-shrink-0 ${isActive ? 'scale-110' : 'opacity-40 hover:opacity-100'
                                             }`}
                                     >
-                                        <div className={`w-14 h-14 rounded-full border-2 p-0.5 transition-all duration-500 ${isActive ? 'border-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.5)]' : 'border-transparent group-hover:border-white/20'
+                                        <div className={`w-14 h-14 rounded-full border-2 p-0.5 transition-all duration-500 ${isActive ? 'border-blue-500 shadow-lg ring-2 ring-blue-100' : 'border-transparent group-hover:border-gray-300'
                                             }`}>
-                                            {emp.photo ? (
-                                                <img src={emp.photo} alt={emp.firstName} className="w-full h-full rounded-full object-cover" />
+                                            {(emp.photo || emp.photoURL) ? (
+                                                <img
+                                                    src={emp.photo || emp.photoURL}
+                                                    alt={emp.firstName}
+                                                    className="w-full h-full rounded-full object-cover"
+                                                    onError={(e) => {
+                                                        e.currentTarget.style.display = 'none';
+                                                        const parent = e.currentTarget.parentElement;
+                                                        if (parent) {
+                                                            parent.classList.add('bg-gray-100', 'flex', 'items-center', 'justify-center');
+                                                        }
+                                                    }}
+                                                />
                                             ) : (
-                                                <div className="w-full h-full rounded-full bg-blue-800 flex items-center justify-center">
+                                                <div className="w-full h-full rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
                                                     <User size={24} />
                                                 </div>
                                             )}
                                         </div>
-                                        <span className={`text-[10px] font-bold truncate w-20 text-center uppercase tracking-tighter transition-colors ${isActive ? 'text-cyan-400' : 'text-blue-100'
+                                        <span className={`text-[10px] font-bold truncate w-20 text-center uppercase tracking-tighter transition-colors ${isActive ? 'text-blue-600' : 'text-gray-500'
                                             }`}>
                                             {emp.firstName}
                                         </span>
@@ -386,10 +409,25 @@ const AnalysesPage: React.FC = () => {
                         </aside>
 
                         {/* Main Content: Central Histogram */}
-                        <main className="flex-1 flex flex-col p-8 overflow-hidden bg-gradient-to-br from-blue-900/50 to-transparent">
-                            <div className="flex-1 bg-black/20 rounded-[30px] p-6 overflow-y-auto border border-white/5 flex flex-col relative group">
+                        {/* Main Content: Central Histogram */}
+                        <main className="flex-1 flex flex-col p-8 overflow-hidden bg-gray-50/50">
+                            <div className="flex-1 bg-white rounded-[30px] p-6 overflow-y-auto border border-gray-100 flex flex-col relative group shadow-inner">
+                                {/* Vertical grid lines */}
+                                <div className="absolute inset-0 pointer-events-none left-[24px] right-[8px]">
+                                    {[6, 12, 18, 24].map(hour => {
+                                        const position = (hour / 24) * 100;
+                                        return (
+                                            <div
+                                                key={hour}
+                                                className="absolute top-10 bottom-4 w-px bg-gray-100 border-l border-dashed border-gray-300"
+                                                style={{ left: `${position}%` }}
+                                            />
+                                        );
+                                    })}
+                                </div>
+
                                 {/* X-Axis labels (graduations) */}
-                                <div className="flex justify-between px-10 mb-6 text-[10px] font-black text-blue-300/80 uppercase tracking-widest border-b border-white/5 pb-3">
+                                <div className="flex justify-between px-2 mb-6 text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100 pb-3 relative z-10">
                                     <span>0h</span>
                                     <span>6h</span>
                                     <span>12h</span>
@@ -397,16 +435,16 @@ const AnalysesPage: React.FC = () => {
                                     <span>24h</span>
                                 </div>
 
-                                <div className="space-y-2 pr-2">
+                                <div className="space-y-3 pr-2 relative z-10">
                                     {monthlyData.map((data, idx) => (
                                         <div key={idx} className="flex items-center gap-4 group/row">
-                                            <span className="w-6 text-[10px] font-black text-blue-400/50 group-hover/row:text-cyan-400 transition-colors">{data.day}</span>
-                                            <div className="flex-1 h-4 bg-white/5 rounded-full relative overflow-hidden group-hover/row:bg-white/10 transition-colors">
+                                            <span className="w-6 text-[10px] font-bold text-gray-400 group-hover/row:text-blue-600 transition-colors">{data.day}</span>
+                                            <div className="flex-1 h-3 bg-gray-100 rounded-full relative overflow-hidden group-hover/row:bg-gray-200 transition-colors">
                                                 {data.segments.map((seg, sIdx) => (
                                                     <div
                                                         key={sIdx}
-                                                        className={`absolute h-full rounded-full transition-all duration-700 shadow-[0_2px_5px_rgba(0,0,0,0.2)] ${seg.type === 'normal' ? 'bg-[#10b981]' :
-                                                            seg.type === 'late' ? 'bg-[#f59e0b]' : 'bg-[#0ea5e9]'
+                                                        className={`absolute h-full rounded-full transition-all duration-700 shadow-sm ${seg.type === 'normal' ? 'bg-emerald-500' :
+                                                                seg.type === 'late' ? 'bg-amber-500' : 'bg-sky-500'
                                                             }`}
                                                         style={{
                                                             left: `${(seg.start / (24 * 60)) * 100}%`,
@@ -421,18 +459,18 @@ const AnalysesPage: React.FC = () => {
                             </div>
 
                             {/* Legend - Floating bar style */}
-                            <div className="mt-8 flex justify-center gap-8 text-[10px] font-black uppercase tracking-[0.15em] py-4 bg-white/5 rounded-full border border-white/5">
-                                <div className="flex items-center gap-2 group cursor-help" title="09:00 - 18:00">
-                                    <div className="w-3 h-3 rounded-full bg-[#10b981] shadow-[0_0_10px_rgba(16,185,129,0.5)]" />
-                                    <span className="text-emerald-50">Présence</span>
+                            <div className="mt-6 flex justify-center gap-8 text-[10px] font-bold uppercase tracking-[0.15em] py-3 bg-white rounded-full border border-gray-200 shadow-sm">
+                                <div className="flex items-center gap-2 group cursor-help ml-6" title="09:00 - 18:00">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm" />
+                                    <span className="text-gray-600">Présence</span>
                                 </div>
                                 <div className="flex items-center gap-2 group cursor-help" title="Arrivée après 09:00">
-                                    <div className="w-3 h-3 rounded-full bg-[#f59e0b] shadow-[0_0_10px_rgba(245,158,11,0.5)]" />
-                                    <span className="text-amber-50">Retard</span>
+                                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm" />
+                                    <span className="text-gray-600">Retard</span>
                                 </div>
-                                <div className="flex items-center gap-2 group cursor-help" title="Départ après 18:00">
-                                    <div className="w-3 h-3 rounded-full bg-[#0ea5e9] shadow-[0_0_10px_rgba(14,165,233,0.5)]" />
-                                    <span className="text-sky-50">Supp</span>
+                                <div className="flex items-center gap-2 group cursor-help mr-6" title="Départ après 18:00">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-sky-500 shadow-sm" />
+                                    <span className="text-gray-600">Supp</span>
                                 </div>
                             </div>
                         </main>
@@ -509,8 +547,19 @@ const AnalysesPage: React.FC = () => {
                             {timeBasedStatus.inside.map((emp) => (
                                 <div key={emp.id} className="bg-white border border-gray-100 p-2.5 rounded-xl shadow-sm flex items-center gap-3 transition-all hover:scale-105 hover:shadow-md animate-in slide-in-from-left-2 duration-300">
                                     <div className="w-10 h-10 rounded-full border-2 border-green-200 overflow-hidden flex-shrink-0">
-                                        {emp.photo ? (
-                                            <img src={emp.photo} alt={emp.firstName} className="w-full h-full object-cover" />
+                                        {(emp.photo || emp.photoURL) ? (
+                                            <img
+                                                src={emp.photo || emp.photoURL}
+                                                alt={emp.firstName}
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    e.currentTarget.style.display = 'none';
+                                                    const parent = e.currentTarget.parentElement;
+                                                    if (parent) {
+                                                        parent.classList.add('bg-gray-50', 'flex', 'items-center', 'justify-center');
+                                                    }
+                                                }}
+                                            />
                                         ) : (
                                             <div className="w-full h-full bg-gray-50 flex items-center justify-center text-gray-300">
                                                 <User size={16} />
@@ -541,8 +590,19 @@ const AnalysesPage: React.FC = () => {
                             {timeBasedStatus.outside.map((emp) => (
                                 <div key={emp.id} className="bg-gray-50/50 border border-gray-100 p-2.5 rounded-xl flex items-center gap-3 opacity-60 transition-all hover:opacity-100 animate-in slide-in-from-right-2 duration-300">
                                     <div className="w-10 h-10 rounded-full border-2 border-gray-200 overflow-hidden flex-shrink-0 grayscale">
-                                        {emp.photo ? (
-                                            <img src={emp.photo} alt={emp.firstName} className="w-full h-full object-cover" />
+                                        {(emp.photo || emp.photoURL) ? (
+                                            <img
+                                                src={emp.photo || emp.photoURL}
+                                                alt={emp.firstName}
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {
+                                                    e.currentTarget.style.display = 'none';
+                                                    const parent = e.currentTarget.parentElement;
+                                                    if (parent) {
+                                                        parent.classList.add('bg-gray-50', 'flex', 'items-center', 'justify-center');
+                                                    }
+                                                }}
+                                            />
                                         ) : (
                                             <div className="w-full h-full bg-gray-50 flex items-center justify-center text-gray-300">
                                                 <User size={16} />

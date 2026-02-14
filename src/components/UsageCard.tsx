@@ -36,7 +36,7 @@ const UsageCard: React.FC<UsageCardProps> = ({ title, icon: Icon, current, limit
                 <div className="flex justify-between items-end">
                     <p className="text-sm text-gray-500">
                         <span className={clsx("font-bold text-lg", isAlert ? "text-red-600" : "text-gray-900")}>
-                            {current.toFixed(2)}
+                            {(current || 0).toFixed(2)}
                         </span>
                         <span className="ml-1">{unit}</span>
                     </p>

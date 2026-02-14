@@ -2,17 +2,9 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, CheckCircle, ArrowLeft, Phone, AlertCircle, Loader2 } from 'lucide-react';
 import { useStore } from '../context/StoreContext';
-import emailjs from '@emailjs/browser';
-
-// CONFIGURATION EMAILJS
-// Vous devez créer un compte sur https://www.emailjs.com/
-// Puis remplacer ces valeurs par les vôtres :
-const EMAILJS_SERVICE_ID = "service_h2084is"; // Exemple: service_xxxx
-const EMAILJS_TEMPLATE_ID = "template_w28in2r"; // Exemple: template_xxxx
-const EMAILJS_PUBLIC_KEY = "JB3dbnW1P6m3YWZEY"; // Exemple: user_xxxx
 
 const ForgotPasswordPage: React.FC = () => {
-    const { findAdminByPhone } = useStore();
+    const { findAdminByPhone, resetPassword } = useStore();
     const [phone, setPhone] = useState('');
     const [email, setEmail] = useState('');
     const [submitted, setSubmitted] = useState(false);
@@ -24,40 +16,50 @@ const ForgotPasswordPage: React.FC = () => {
         setError(null);
         setLoading(true);
 
-        const admin = await findAdminByPhone(phone);
-
-        if (!admin) {
-            setError("Aucun compte administrateur trouvé avec ce numéro de téléphone.");
-            setLoading(false);
-            return;
-        }
-
-        setEmail(admin.email);
+        // v1.9.7: Timeout GLOBAL pour toute la procédure (30s)
+        const globalTimeout = setTimeout(() => {
+            if (loading) {
+                console.error("🚨 TIMEOUT GLOBAL DÉCLENCHÉ (30s)");
+                setError("La procédure est trop longue. Vérifiez votre connexion internet.");
+                setLoading(false);
+            }
+        }, 30000);
 
         try {
-            // Envoi réel via EmailJS
-            const templateParams = {
-                to_email: admin.email,
-                to_name: admin.name,
-                reset_link: `${window.location.origin}/reset-password?email=${encodeURIComponent(admin.email)}`,
-                phone: admin.phone,
-                username: admin.username
-            };
+            console.log("🔍 [Step 1] Recherche de l'admin par téléphone:", phone);
+            const admin = await findAdminByPhone(phone);
 
-            await emailjs.send(
-                EMAILJS_SERVICE_ID,
-                EMAILJS_TEMPLATE_ID,
-                templateParams,
-                EMAILJS_PUBLIC_KEY
-            );
+            if (!admin) {
+                console.log("❌ [Step 1] Aucun admin trouvé.");
+                setError("Aucun compte administrateur trouvé avec ce numéro de téléphone.");
+                setLoading(false);
+                clearTimeout(globalTimeout);
+                return;
+            }
 
+            console.log("✅ [Step 1] Admin trouvé:", admin.email);
+            setEmail(admin.email);
+            alert("Compte identifié !\nEmail de secours : " + admin.email + "\n\nJe demande maintenant à Google d'envoyer le lien...");
+
+            console.log("📨 [Step 2] Déclenchement réinitialisation officielle Firebase...");
+            const ok = await resetPassword(admin.email);
+
+            if (!ok) {
+                alert("❌ Erreur : Google a refusé d'envoyer l'email. Vérifiez que l'adresse " + admin.email + " est valide.");
+                throw new Error("Impossible d'envoyer l'email de réinitialisation. Veuillez vérifier votre connexion.");
+            }
+
+            alert("✅ SUCCÈS : Google confirme l'envoi de l'email à : " + admin.email + "\n\n(Pensez à regarder dans vos SPAMS / Courriers indésirables)");
+            console.log("✅ [Step 2] Email Firebase envoyé avec succès!");
             setSubmitted(true);
         } catch (err: any) {
-            console.error("Erreur EmailJS:", err);
-            const detail = err?.text || err?.message || "Erreur inconnue";
-            setError(`Impossible d'envoyer l'email : ${detail}. Vérifiez votre configuration EmailJS.`);
+            console.error("❌ Erreur Récupération:", err);
+            const detail = err?.message || JSON.stringify(err) || "Erreur inconnue";
+            setError(`Problème : ${detail}.`);
         } finally {
+            console.log("🏁 Fin de la procédure.");
             setLoading(false);
+            clearTimeout(globalTimeout);
         }
     };
 
@@ -81,8 +83,10 @@ const ForgotPasswordPage: React.FC = () => {
                         </div>
                         <h3 className="text-xl font-bold text-gray-800 mb-2">Email envoyé !</h3>
                         <p className="text-gray-500 text-sm mb-6">
-                            Un lien de réinitialisation a été envoyé à l'adresse associée : <br />
+                            Un email **officiel de Google** a été envoyé à : <br />
                             <strong className="text-gray-700">{email}</strong>
+                            <br /><br />
+                            Cliquez sur le lien dans cet email pour créer votre nouveau mot de passe.
                         </p>
 
                         <Link to="/login" className="text-blue-600 font-bold flex items-center justify-center gap-2 hover:underline">
@@ -140,7 +144,7 @@ const ForgotPasswordPage: React.FC = () => {
 
             <div className="mt-8 max-w-md text-center">
                 <p className="text-xs text-gray-400">
-                    Note: L'email sera envoyé à l'adresse enregistrée lors de votre inscription (noreply).
+                    Note: L'email sera envoyé par Firebase (Google) à l'adresse enregistrée lors de votre inscription.
                 </p>
             </div>
         </div>

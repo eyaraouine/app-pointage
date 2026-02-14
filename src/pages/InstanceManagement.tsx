@@ -17,24 +17,29 @@ const InstanceManagement: React.FC = () => {
 
     const loadAdmins = async () => {
         setLoading(true);
-        const data = await getAllAdmins();
-        const MASTER_ADMIN_SEARCH = "hatem raouine";
+        try {
+            const data = await getAllAdmins();
+            const MASTER_ADMIN_SEARCH = "hatem raouine";
 
-        // Filter out super admins and sort Master Admin to the top
-        const sortedAdmins = data
-            .filter(a => a.role !== 'SUPER_ADMIN')
-            .sort((a, b) => {
-                const nameA = (a.name || "").toLowerCase();
-                const nameB = (b.name || "").toLowerCase();
-                const isAMaster = nameA.includes(MASTER_ADMIN_SEARCH);
-                const isBMaster = nameB.includes(MASTER_ADMIN_SEARCH);
-                if (isAMaster && !isBMaster) return -1;
-                if (!isAMaster && isBMaster) return 1;
-                return 0;
-            });
+            // Filter out super admins and sort Master Admin to the top
+            const sortedAdmins = data
+                .sort((a, b) => {
+                    const nameA = (a.name || "").toLowerCase();
+                    const nameB = (b.name || "").toLowerCase();
+                    const isAMaster = nameA.includes(MASTER_ADMIN_SEARCH);
+                    const isBMaster = nameB.includes(MASTER_ADMIN_SEARCH);
+                    if (isAMaster && !isBMaster) return -1;
+                    if (!isAMaster && isBMaster) return 1;
+                    return 0;
+                });
 
-        setAdmins(sortedAdmins);
-        setLoading(false);
+            setAdmins(sortedAdmins);
+        } catch (error) {
+            console.error("Failed to load admins:", error);
+            // Optionally set an error state here if you have one
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleSuspend = async (admin: AdminUser) => {
@@ -42,8 +47,13 @@ const InstanceManagement: React.FC = () => {
         if (isMaster) return; // Safety check
         if (!confirm(admin.suspended ? "Réactiver ce compte ?" : "Suspendre ce compte ?")) return;
 
-        await toggleAdminSuspend(admin.id, !admin.suspended);
-        await loadAdmins(); // Reload to see changes
+        try {
+            await toggleAdminSuspend(admin.id, !admin.suspended);
+            await loadAdmins(); // Reload to see changes
+        } catch (error) {
+            alert("❌ Erreur lors de la modification du statut. Veuillez réessayer.");
+            console.error("Suspend error:", error);
+        }
     };
 
     const handleImpersonate = async (admin: AdminUser) => {
@@ -56,9 +66,9 @@ const InstanceManagement: React.FC = () => {
     };
 
     const filteredAdmins = admins.filter(admin =>
-        admin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        admin.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        admin.username.toLowerCase().includes(searchTerm.toLowerCase())
+        (admin.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (admin.email || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (admin.username || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (

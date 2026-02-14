@@ -30,7 +30,7 @@ const MonitoringSection: React.FC = () => {
                 metadatas.forEach(meta => totalBytes += meta.size || 0);
 
                 // Extrapolate if more than 100 files
-                const extrapolatedBytes = list.items.length > 100
+                const extrapolatedBytes = (list.items.length > 100 && totalBytes > 0)
                     ? (totalBytes / 100) * list.items.length
                     : totalBytes;
 
@@ -40,7 +40,7 @@ const MonitoringSection: React.FC = () => {
 
                 // We don't have exact size API in JS SDK, estimating 1KB per doc avg
                 // This is a rough but useful indicator for the user
-                const estimatedFirestoreMB = ((employeesSnap.size + logsSnap.size) * 1024) / (1024 * 1024);
+                const estimatedFirestoreMB = (((employeesSnap?.size || 0) + (logsSnap?.size || 0)) * 1024) / (1024 * 1024);
 
                 setStats(prev => ({
                     ...prev,

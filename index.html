@@ -1,13 +1,38 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>app-de-pointage</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>app-de-pointage</title>
+  <script>
+    // CACHE KILLER v1.6.9
+    (function () {
+      const CURRENT_VERSION = "2.0.7";
+      console.log("CACHE CHECK v" + CURRENT_VERSION);
+
+      const savedVersion = localStorage.getItem('last_version');
+      if (savedVersion !== CURRENT_VERSION) {
+        // Normal update logic: clear workers to be safe, but no aggressive loops
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(regs => {
+            for (let reg of regs) reg.unregister();
+          });
+        }
+      }
+      localStorage.setItem('last_version', CURRENT_VERSION);
+    })();
+  </script>
+</head>
+
+<body>
+  <div id="root"></div>
+
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+
 </html>

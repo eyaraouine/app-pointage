@@ -32,8 +32,18 @@ const EmployeeList: React.FC<EmployeeListProps> = ({ onEdit, onSetSchedule }) =>
             {sortedEmployees.map((employee) => (
                 <div key={employee.id} className="bg-white p-4 rounded-lg shadow flex items-center gap-4">
                     <div className="w-16 h-16 rounded-full overflow-hidden bg-blue-100 flex-shrink-0 border-2 border-blue-50">
-                        {employee.photo ? (
-                            <img src={employee.photo} alt={`${employee.firstName} ${employee.lastName}`} className="w-full h-full object-cover" />
+                        {(employee.photo || employee.photoURL) ? (
+                            <img
+                                src={employee.photo || employee.photoURL}
+                                alt={`${employee.firstName} ${employee.lastName}`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                    // Fallback if image fails to load
+                                    e.currentTarget.style.display = 'none';
+                                    e.currentTarget.parentElement?.classList.add('flex', 'items-center', 'justify-center');
+                                    // Add an icon dynamically via JS if needed, or just rely on the parent div
+                                }}
+                            />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center">
                                 <User className="text-blue-600" size={24} />

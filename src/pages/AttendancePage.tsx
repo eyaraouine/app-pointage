@@ -6,14 +6,26 @@ import { MapPin, CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { getDistance } from 'geolib';
 import { useLanguage } from '../context/LanguageContext';
 import { playSuccessBeep } from '../utils/sound';
+import { speak } from '../utils/speech';
 import type { Zone } from '../types';
 import AdminAccessButton from '../components/AdminAccessButton';
 import AdminSuccessModal from '../components/AdminSuccessModal';
 import clsx from 'clsx';
 
 const AttendancePage: React.FC = () => {
-    const { t } = useLanguage();
-    const { employees, zones, logs, addLog, modelsLoaded, enableKioskAdmin, setDetectedAdminId } = useStore();
+    const { t, language } = useLanguage();
+    const {
+        employees,
+        zones,
+        logs,
+        addLog,
+        modelsLoaded,
+        isEmployeesLoading,
+        adminUser,
+        setDetectedAdminId,
+        enableKioskAdmin
+    } = useStore();
+
     const webcamRef = useRef<Webcam>(null);
 
     const [location, setLocation] = useState<{ lat: number, lng: number, accuracy: number } | null>(null);
@@ -26,6 +38,21 @@ const AttendancePage: React.FC = () => {
     const [lastLogType, setLastLogType] = useState<'check-in' | 'check-out' | null>(null);
     const [isAdminButtonVisible, setIsAdminButtonVisible] = useState(false);
     const [showAdminSuccessModal, setShowAdminSuccessModal] = useState(false);
+
+    // v1.5.5: TIMEOUT GUARD - If loading takes > 10s, show rescue screen
+    const [isLongLoading, setIsLongLoading] = useState(false);
+    const isPublicMode = !adminUser;
+    const isLoadingPublicMode = isPublicMode && (!currentZone || isEmployeesLoading);
+
+    useEffect(() => {
+        let timer: NodeJS.Timeout;
+        if (isLoadingPublicMode) {
+            timer = setTimeout(() => setIsLongLoading(true), 10000); // 10s timeout
+        }
+        return () => clearTimeout(timer);
+    }, [isLoadingPublicMode]);
+
+
 
     const labeledDescriptors = useMemo(() => {
         if (!employees.length) return [];
@@ -45,10 +72,16 @@ const AttendancePage: React.FC = () => {
             (position) => {
                 const { latitude, longitude, accuracy } = position.coords;
                 setLocation({ lat: latitude, lng: longitude, accuracy });
-                setError(prev => (accuracy > 100 ? t('attendance.gps_imprecise') : (prev?.includes("Localisation") || prev?.includes("Inaccurate") || prev?.includes("دقيق") ? null : prev)));
+                setError(prev => (accuracy > 100 ? t('attendance.gps_imprecise') : (prev?.includes("Localisation") || prev?.includes("Inaccurate") || prev?.includes("GPS") ? null : prev)));
             },
-            (err) => setError(t('attendance.gps_error') + ": " + err.message),
-            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+            (err) => {
+                if (err.code === 3) {
+                    setError("🌐 Signal GPS faible. Attendez ou déplacez-vous à l'extérieur.");
+                } else {
+                    setError(t('attendance.gps_error') + ": " + err.message);
+                }
+            },
+            { enableHighAccuracy: true, timeout: 60000, maximumAge: 0 }
         );
 
         return () => navigator.geolocation.clearWatch(watchId);
@@ -125,6 +158,7 @@ const AttendancePage: React.FC = () => {
             const detection = await faceapi.detectSingleFace(webcamRef.current.video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
                 .withFaceLandmarks().withFaceDescriptor();
             if (detection) {
+                if (labeledDescriptors.length === 0) return;
                 const match = new faceapi.FaceMatcher(labeledDescriptors, 0.6).findBestMatch(detection.descriptor);
                 const emp = employees.find(e => e.id === match.label);
                 if (emp) {
@@ -160,6 +194,11 @@ const AttendancePage: React.FC = () => {
             }
 
             if (!detection) throw new Error(t('attendance.face_not_detected'));
+
+            if (labeledDescriptors.length === 0) {
+                throw new Error("Aucune donnée faciale chargée. Attendez quelques secondes.");
+            }
+
             const match = new faceapi.FaceMatcher(labeledDescriptors, 0.6).findBestMatch(detection.descriptor);
             if (match.label === 'unknown') throw new Error(t('attendance.face_not_recognized'));
 
@@ -174,6 +213,19 @@ const AttendancePage: React.FC = () => {
                 setLastLogType(type);
                 addLog({ id: crypto.randomUUID(), employeeId: emp.id, timestamp: new Date().toISOString(), type, location: location || { lat: 0, lng: 0 }, verified: true, method: 'face_geo', zoneName: currentZone.name, adminId: currentZone.adminId });
                 playSuccessBeep();
+
+                // v1.9.2: Language-aware Voice Feedback
+                const messages = {
+                    fr: `Bienvenue, ${emp.firstName}`,
+                    ar: `مرحباً, ${emp.firstName}`,
+                    en: `Welcome, ${emp.firstName}`
+                };
+
+                // v1.9.3 FIX: Actually calling the speak function!
+                const langCode = (language === 'ar' || language === 'en' || language === 'fr') ? language : 'fr';
+                const msg = messages[langCode];
+                speak(msg, langCode);
+
                 setStatus('success');
                 setTimeout(() => { setStatus('idle'); setMatchedEmployee(null); setMatchedPhoto(null); }, 3000);
             }
@@ -182,6 +234,38 @@ const AttendancePage: React.FC = () => {
             setStatus('idle');
         }
     };
+
+    // v1.6.1: MOVED GUARD TO END OF HOOKS BLOCK to fix React Error #310 (Hooks violation)
+    if (isLoadingPublicMode) {
+        if (isLongLoading) {
+            return (
+                <div className="min-h-screen flex flex-col items-center justify-center bg-red-50 p-6 text-center">
+                    <AlertTriangle className="text-red-600 mb-4" size={48} />
+                    <h2 className="text-xl font-bold text-red-700">Le chargement est trop long.</h2>
+                    <p className="text-gray-600 text-sm mt-2 mb-4">
+                        Zones: {zones.length} | Employés: {employees.length}
+                    </p>
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="bg-red-600 text-white px-6 py-3 rounded-lg font-bold shadow-lg active:scale-95"
+                    >
+                        🔄 FORCER L'ACTUALISATION
+                    </button>
+                    <div className="mt-8 text-xs text-gray-400 font-mono">
+                        Debug: {new Date().toLocaleTimeString()}
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
+                <Loader2 className="animate-spin text-blue-600 mb-4" size={48} />
+                <h2 className="text-xl font-bold text-gray-700">Chargement...</h2>
+                <p className="text-gray-500 text-sm mt-2">Patience, le réseau est lent.</p>
+            </div>
+        );
+    }
 
     if (!modelsLoaded) return <div className="flex flex-col h-full items-center justify-center p-8 text-center"><Loader2 className="animate-spin text-blue-600 mb-4" size={48} /><p className="text-gray-400 font-medium italic">{t('attendance.loading_models')}</p></div>;
 
@@ -233,13 +317,36 @@ const AttendancePage: React.FC = () => {
 
                 {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl flex items-center gap-3 text-sm font-medium animate-in slide-in-from-top-2"><AlertTriangle size={20} />{error}</div>}
 
+                {error && error.includes("GPS") && (
+                    <button
+                        onClick={() => window.location.reload()}
+                        className="w-full py-3 bg-red-100 text-red-700 rounded-xl font-bold text-sm mb-4 border border-red-200"
+                    >
+                        🔄 RÉESSAYER LE GPS
+                    </button>
+                )}
+
                 <button
                     onClick={handlePointage}
-                    disabled={status === 'processing' || !currentZone}
+                    disabled={status === 'processing' || !currentZone || employees.length === 0}
                     className="w-full py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-black text-xl shadow-xl transition-all active:scale-95 disabled:bg-gray-200 disabled:text-gray-400 disabled:shadow-none"
                 >
-                    {status === 'processing' ? t('attendance.verifying') : t('attendance.check_in_button')}
+                    {status === 'processing'
+                        ? t('attendance.verifying')
+                        : (isEmployeesLoading
+                            ? (currentZone ? "Synchronisation site..." : "Découverte site (GPS)...")
+                            : (!currentZone
+                                ? "Recherche de votre site..."
+                                : (employees.length === 0
+                                    ? "Aucun employé sur ce site"
+                                    : t('attendance.check_in_button'))))}
                 </button>
+
+                {employees.length === 0 && currentZone && (
+                    <p className="mt-4 text-[10px] text-gray-400 font-mono text-center opacity-50">
+                        Debug Site ID: {currentZone.adminId}
+                    </p>
+                )}
             </div>
         </div>
     );

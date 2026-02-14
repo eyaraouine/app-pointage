@@ -402,9 +402,9 @@ const LogsPage: React.FC = () => {
                                     onClick={() => hasPointed && setSelectedEmployeeId(stat.employeeId)}
                                     className="w-full bg-white p-3 rounded-2xl shadow-sm flex items-center gap-3 active:scale-[0.98] transition-all text-left"
                                 >
-                                    <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-                                        {emp.photo ? <img src={emp.photo} alt="" className="w-full h-full object-cover" /> :
-                                            <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold">{emp.firstName[0]}{emp.lastName[0]}</div>}
+                                    <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 relative flex items-center justify-center text-gray-500 font-bold">
+                                        {emp.firstName[0]}{emp.lastName[0]}
+                                        {(emp.photo || emp.photoURL) && <img src={emp.photo || emp.photoURL} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e) => e.currentTarget.style.display = 'none'} />}
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-bold text-gray-900 truncate">{emp.firstName} {emp.lastName}</h3>
@@ -443,9 +443,9 @@ const LogsPage: React.FC = () => {
                                 }}
                                 className="w-full bg-white p-3 rounded-2xl shadow-sm flex items-center gap-3 active:scale-[0.98] transition-all text-left"
                             >
-                                <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 flex-shrink-0">
-                                    {emp.photo ? <img src={emp.photo} alt="" className="w-full h-full object-cover" /> :
-                                        <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold">{emp.firstName[0]}{emp.lastName[0]}</div>}
+                                <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 relative flex items-center justify-center text-gray-500 font-bold">
+                                    {emp.firstName[0]}{emp.lastName[0]}
+                                    {(emp.photo || emp.photoURL) && <img src={emp.photo || emp.photoURL} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e) => e.currentTarget.style.display = 'none'} />}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <h3 className="font-bold text-gray-900 truncate">{emp.firstName} {emp.lastName}</h3>
@@ -489,8 +489,9 @@ const LogsPage: React.FC = () => {
                     </div>
 
                     <div className="p-6 flex flex-col items-center border-b">
-                        <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-200 mb-4">
-                            {selectedEmployee.photo && <img src={selectedEmployee.photo} alt="" className="w-full h-full object-cover" />}
+                        <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-200 mb-4 relative flex items-center justify-center text-gray-500 font-bold text-2xl">
+                            {selectedEmployee.firstName[0]}{selectedEmployee.lastName[0]}
+                            {(selectedEmployee.photo || selectedEmployee.photoURL) && <img src={selectedEmployee.photo || selectedEmployee.photoURL} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e) => e.currentTarget.style.display = 'none'} />}
                         </div>
                         <h3 className="text-xl font-bold text-gray-900">{selectedEmployee.firstName} {selectedEmployee.lastName}</h3>
                     </div>
@@ -544,8 +545,9 @@ const LogsPage: React.FC = () => {
                     <div className="bg-white w-full max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-2xl animate-slide-up">
                         <div className="p-4 border-b flex justify-between items-center bg-gray-50">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200">
-                                    {selectedEmployee.photo && <img src={selectedEmployee.photo} alt="" className="w-full h-full object-cover" />}
+                                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 relative flex items-center justify-center text-gray-500 font-bold">
+                                    {selectedEmployee.firstName[0]}{selectedEmployee.lastName[0]}
+                                    {(selectedEmployee.photo || selectedEmployee.photoURL) && <img src={selectedEmployee.photo || selectedEmployee.photoURL} alt="" className="absolute inset-0 w-full h-full object-cover" onError={(e) => e.currentTarget.style.display = 'none'} />}
                                 </div>
                                 <div>
                                     <h2 className="font-bold text-gray-900">{selectedEmployee.firstName} {selectedEmployee.lastName}</h2>

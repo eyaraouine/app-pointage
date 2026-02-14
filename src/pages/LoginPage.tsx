@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useStore } from '../context/StoreContext';
 import { useLanguage } from '../context/LanguageContext';
-import { LogIn, AlertCircle } from 'lucide-react';
+import { LogIn, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 const LoginPage: React.FC = () => {
     const { t } = useLanguage();
@@ -17,10 +17,13 @@ const LoginPage: React.FC = () => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         if (adminUser || isKioskAdmin || storedAuth) {
-            navigate(from, { replace: true });
+            const target = adminUser?.role === 'SUPER_ADMIN' ? '/super-admin/dashboard' : from;
+            console.log("LoginPage: Auto-redirecting to", target);
+            navigate(target, { replace: true });
         }
     }, [adminUser, isKioskAdmin, storedAuth, navigate, from]);
 
@@ -32,7 +35,8 @@ const LoginPage: React.FC = () => {
         try {
             const success = await loginAdmin(email, password);
             if (success) {
-                navigate(from, { replace: true });
+                const target = email.toLowerCase() === 'glorysmart.tech@gmail.com' ? '/super-admin/dashboard' : from;
+                navigate(target, { replace: true });
             } else {
                 setError(t('login.auth_error'));
             }
@@ -85,14 +89,23 @@ const LoginPage: React.FC = () => {
                                 {t('login.forgot_password')}
                             </Link>
                         </div>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none"
-                            placeholder="••••••••"
-                            required
-                        />
+                        <div className="relative">
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none pr-12"
+                                placeholder="••••••••"
+                                required
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                            >
+                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </button>
+                        </div>
                     </div>
 
                     {error && (

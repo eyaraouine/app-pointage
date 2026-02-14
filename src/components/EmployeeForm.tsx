@@ -48,6 +48,37 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
         }
     }, [webcamRef]);
 
+    const compressImage = (base64: string): Promise<string> => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+                const maxSize = 300;
+
+                if (width > height) {
+                    if (width > maxSize) {
+                        height *= maxSize / width;
+                        width = maxSize;
+                    }
+                } else {
+                    if (height > maxSize) {
+                        width *= maxSize / height;
+                        height = maxSize;
+                    }
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', 0.6));
+            };
+            img.src = base64;
+        });
+    };
+
     const retake = () => {
         setCapturedImage(null);
         setIsCapturing(true);
@@ -128,19 +159,22 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
                 }
             }
 
-            // 4. Upload photo if it's new (is a base64 string)
+            // 4. Compress and Upload photo if it's new (is a base64 string)
             let photoURL = employeeToEdit?.photoURL || "";
             const isBase64 = capturedImage.startsWith('data:image');
 
             if (isBase64) {
+                setProcessingStep('Optimisation de la photo...');
+                const compressed = await compressImage(capturedImage);
+
                 setProcessingStep('Téléchargement de la photo...');
                 const tempId = employeeToEdit?.id || (typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : Math.random().toString(36).substring(2));
-                photoURL = await uploadEmployeePhoto(tempId, capturedImage);
+                photoURL = await uploadEmployeePhoto(tempId, compressed);
             }
 
             // 5. Save/Update employee
             setProcessingStep('Enregistrement...');
-            const employeeData = {
+            const employeeData: Employee = {
                 id: employeeToEdit?.id || '',
                 firstName,
                 lastName,
@@ -149,8 +183,9 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSuccess, employeeToEdit }
                 photoURL,
                 matricule: matricule || "",
                 phone: phone || "",
-                role: employeeToEdit?.role || 'employee' as const,
+                role: (employeeToEdit?.role || 'employee') as 'admin' | 'employee',
                 isKiosk,
+                adminId: employeeToEdit?.adminId,
             };
 
             if (employeeToEdit) {

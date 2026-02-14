@@ -4,16 +4,19 @@ import { Users, Building2, Server, Settings, Activity } from 'lucide-react';
 import MonitoringSection from '../components/MonitoringSection';
 
 const SuperAdminDashboard: React.FC = () => {
-    const { employees, getAllAdmins, modelsLoaded } = useStore();
-    const [adminCount, setAdminCount] = useState(0);
+    const { getGlobalStats, modelsLoaded } = useStore();
+    const [stats, setStats] = useState({ employeeCount: 0, adminCount: 0 });
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetchAdmins = async () => {
-            const admins = await getAllAdmins();
-            setAdminCount(admins.length);
+        const fetchStats = async () => {
+            setLoading(true);
+            const data = await getGlobalStats();
+            setStats(data);
+            setLoading(false);
         };
-        fetchAdmins();
-    }, [getAllAdmins]);
+        fetchStats();
+    }, [getGlobalStats]);
 
     return (
         <div className="p-6 space-y-8 max-w-7xl mx-auto">
@@ -30,7 +33,9 @@ const SuperAdminDashboard: React.FC = () => {
                     </div>
                     <div>
                         <p className="text-sm font-medium text-gray-500">Utilisateurs Actifs</p>
-                        <h3 className="text-3xl font-bold text-gray-900">{employees.length}</h3>
+                        <h3 className="text-3xl font-bold text-gray-900">
+                            {loading ? '...' : stats.employeeCount}
+                        </h3>
                     </div>
                 </div>
 
@@ -40,7 +45,9 @@ const SuperAdminDashboard: React.FC = () => {
                     </div>
                     <div>
                         <p className="text-sm font-medium text-gray-500">Sociétés Inscrites</p>
-                        <h3 className="text-3xl font-bold text-gray-900">{adminCount}</h3>
+                        <h3 className="text-3xl font-bold text-gray-900">
+                            {loading ? '...' : stats.adminCount}
+                        </h3>
                     </div>
                 </div>
 
